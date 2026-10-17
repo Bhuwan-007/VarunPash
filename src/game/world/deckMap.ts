@@ -245,6 +245,17 @@ export function createDeckMap(): GameMap {
       highlightSize: { width: 0.7, height: 1.6, offsetX: 0.15, offsetY: 0.7 },
     },
     {
+      id: 'npc_bhima',
+      scene: 'deck',
+      x: 5,
+      y: 13,
+      width: 1,
+      height: 1,
+      type: 'statue',
+      label: 'Talk to Bhima (Cook)',
+      highlightSize: { width: 0.7, height: 0.8, offsetX: 0.15, offsetY: 0.1 },
+    },
+    {
       id: 'quarterdeck_crates',
       scene: 'deck',
       x: 12,

@@ -2,6 +2,7 @@ import React from 'react';
 import { CONFIG, PALETTE } from '../config';
 import { useLoopStore } from '../store/loopStore';
 import { useMemoryStore } from '../store/memoryStore';
+import { useUIStore } from '../store/uiStore';
 
 function toRoman(num: number): string {
   if (num <= 0) return 'I';
@@ -32,6 +33,8 @@ export const Hud: React.FC = () => {
   const timeScale = useLoopStore((s) => s.timeScale);
   const deathCount = useMemoryStore((s) => s.deathCount);
   const playerRole = useMemoryStore((s) => s.playerRole);
+  const journalPulse = useUIStore((s) => s.journalPulse);
+  const toggleJournal = useUIStore((s) => s.toggleJournal);
 
   const remainingSeconds = Math.max(0, Math.floor(CONFIG.TIMELINE - shipTime));
   const minutes = Math.floor(remainingSeconds / 60);
@@ -113,6 +116,40 @@ export const Hud: React.FC = () => {
           </span>
           <span style={{ fontSize: '12px', color: PALETTE.Ash }}>UNTIL SINKING</span>
         </div>
+      </div>
+
+      {/* Top Center: Journal Hint & Pulse Indicator */}
+      <div
+        onClick={toggleJournal}
+        style={{
+          pointerEvents: 'auto',
+          cursor: 'pointer',
+          backgroundColor: 'rgba(7, 9, 15, 0.92)',
+          border: `2px solid ${journalPulse ? PALETTE.TideGlow : PALETTE.Deepwater}`,
+          padding: '9px 16px',
+          borderRadius: '4px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: journalPulse
+            ? `0 0 20px ${PALETTE.TideGlow}`
+            : '0 4px 12px rgba(0,0,0,0.5)',
+          transition: 'all 0.2s ease',
+          transform: journalPulse ? 'scale(1.05)' : 'scale(1)',
+        }}
+        title="Open Journal (J)"
+      >
+        <span style={{ fontSize: '16px' }}>📖</span>
+        <span
+          style={{
+            fontSize: '13px',
+            fontWeight: 'bold',
+            color: journalPulse ? PALETTE.TideGlow : PALETTE.Bone,
+            letterSpacing: '0.8px',
+          }}
+        >
+          [J] JOURNAL
+        </span>
       </div>
 
       {/* Top Right: Scratched Tally Marks on the Rail (No empty slots, No total) */}

@@ -78,7 +78,13 @@ export class GameRenderer {
       this.drawInteractableHighlight(activeInteractable, effectiveCamX, effectiveCamY, frameTime);
     }
 
-    // --- LAYER 3: Entities (Player) ---
+    // --- LAYER 3: Entities (Player & NPCs) ---
+    if (state.scene === 'deck') {
+      const bhimaX = 5.5 * TILE_SIZE - effectiveCamX;
+      const bhimaY = 13.5 * TILE_SIZE - effectiveCamY;
+      this.drawBhimaNPC(bhimaX, bhimaY);
+    }
+
     const playerScreenX = player.x * TILE_SIZE - effectiveCamX;
     const playerScreenY = player.y * TILE_SIZE - effectiveCamY;
     this.drawPlayer(player, playerScreenX, playerScreenY);
@@ -1048,6 +1054,90 @@ export class GameRenderer {
     } else if (player.facing === 'right') {
       ctx.fillRect(px + 3, py - 21, 2, 2);
     }
+
+    ctx.restore();
+  }
+
+  /**
+   * Bhima the Cook NPC (Procedural visual sprite for P3 test)
+   * Stained canvas apron over coarse tunic, earring, ladle/spoon.
+   */
+  private drawBhimaNPC(bx: number, by: number): void {
+    const { ctx } = this;
+    ctx.save();
+
+    // 1. Drop shadow
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(bx, by + 18, 16, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Heavy work boots
+    ctx.fillStyle = '#221a14';
+    ctx.fillRect(bx - 9, by + 12, 7, 8);
+    ctx.fillRect(bx + 2, by + 12, 7, 8);
+
+    // 3. Stained Canvas Apron & Cook Robes
+    ctx.fillStyle = '#3c2e22'; // Dark tunic underneath
+    ctx.fillRect(bx - 14, by - 14, 28, 26);
+
+    ctx.fillStyle = '#d4c5a9'; // Bone stained apron
+    ctx.fillRect(bx - 10, by - 10, 20, 22);
+
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.6;
+    ctx.strokeRect(bx - 10, by - 10, 20, 22);
+
+    // Apron bib straps
+    ctx.strokeStyle = '#8c7b64';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(bx - 7, by - 10);
+    ctx.lineTo(bx - 5, by - 14);
+    ctx.moveTo(bx + 7, by - 10);
+    ctx.lineTo(bx + 5, by - 14);
+    ctx.stroke();
+
+    // Grease & turmeric stains on apron
+    ctx.fillStyle = 'rgba(163, 114, 43, 0.5)';
+    ctx.beginPath();
+    ctx.arc(bx - 3, by - 2, 4, 0, Math.PI * 2);
+    ctx.arc(bx + 4, by + 4, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 4. Head & Turban
+    ctx.fillStyle = '#a69076'; // Ochre/weathered cloth wrap
+    ctx.beginPath();
+    ctx.arc(bx, by - 23, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // Face shadow
+    ctx.fillStyle = PALETTE.Tar;
+    ctx.beginPath();
+    ctx.arc(bx, by - 21, 7.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Gold hoop earring in left ear
+    ctx.strokeStyle = PALETTE.Lantern;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(bx - 8, by - 20, 2.5, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Eyes glinting
+    ctx.fillStyle = PALETTE.Lantern;
+    ctx.fillRect(bx - 3, by - 21, 2, 2);
+    ctx.fillRect(bx + 2, by - 21, 2, 2);
+
+    // 5. Wooden Cook Spoon tucked in sash
+    ctx.fillStyle = '#9c6f44';
+    ctx.fillRect(bx + 9, by - 8, 3, 18);
+    ctx.beginPath();
+    ctx.ellipse(bx + 10.5, by - 10, 4, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.restore();
   }

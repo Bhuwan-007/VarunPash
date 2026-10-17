@@ -5,7 +5,9 @@ import { GameRenderer } from './game/renderer';
 import { useLoopStore } from './store/loopStore';
 import { DeathToast } from './ui/DeathToast';
 import { DebugPanel } from './ui/DebugPanel';
+import { DialogueBox } from './ui/DialogueBox';
 import { Hud } from './ui/Hud';
+import { Journal } from './ui/Journal';
 
 export const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -105,6 +107,12 @@ export const App: React.FC = () => {
 
         {/* HUD React DOM Overlay */}
         <Hud />
+
+        {/* Dialogue Box Overlay */}
+        <DialogueBox />
+
+        {/* Journal Open-Book Overlay */}
+        <Journal />
 
         {/* Death Toast Overlay */}
         <DeathToast onRespawn={handleRespawn} />

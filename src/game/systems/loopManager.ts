@@ -2,6 +2,7 @@ import { CONFIG, startTimeForDeaths } from '../../config';
 import { useLoopStore } from '../../store/loopStore';
 import { useMemoryStore } from '../../store/memoryStore';
 import { useUIStore } from '../../store/uiStore';
+import { DialogueManager } from '../dialogue/dialogueManager';
 
 export class LoopManager {
   private isDying: boolean = false;
@@ -135,8 +136,13 @@ export class LoopManager {
     // 1. Reset memory store (clears knowledge, journal, endingsSeen, deathCount = 0, re-rolls playerRole)
     memoryState.newGame();
 
-    // 2. Hide death toast
+    // Reset dialogue seen states for a fresh game
+    DialogueManager.resetShownLines();
+
+    // 2. Hide death toast & close any open dialogue or journal
     uiStore.hideDeathToast();
+    uiStore.closeDialogue();
+    uiStore.setJournalOpen(false);
     this.isDying = false;
 
     // 3. Reset loop store to 0 (deathCount = 0 -> startTime = 0)

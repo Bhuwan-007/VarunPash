@@ -5,6 +5,9 @@ export interface JournalEntry {
   tab: string;
   text: string;
   loop: number;
+  title?: string;
+  code?: string;
+  tideTime?: string;
 }
 
 export interface GhostFrame {

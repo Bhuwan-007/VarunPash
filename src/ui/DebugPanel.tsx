@@ -1,5 +1,6 @@
 import React from 'react';
 import { CONFIG, PALETTE, startTimeForDeaths } from '../config';
+import { addKnowledge } from '../game/systems/knowledge';
 import { useLoopStore } from '../store/loopStore';
 import { useMemoryStore } from '../store/memoryStore';
 import { useUIStore } from '../store/uiStore';
@@ -27,7 +28,6 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
   const shipTimeAtDeath = useMemoryStore((s) => s.shipTimeAtDeath);
   const playerRole = useMemoryStore((s) => s.playerRole);
   const knowledge = useMemoryStore((s) => s.knowledge);
-  const addKnowledge = useMemoryStore((s) => s.addKnowledge);
   const setPlayerRole = useMemoryStore((s) => s.setPlayerRole);
 
 
@@ -160,13 +160,13 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
                 KILL (WASTED)
               </button>
               <button
-                onClick={() =>
-                  onKillPlayer(
-                    'Sacrificed to the Kaal Mani (Strategic death test)',
-                    true,
-                    'You remember: The safe code 7-3-1 echoed before the shot.'
-                  )
-                }
+                onClick={() => {
+                  const unlearned = testFlags.find((f) => !knowledge.includes(f));
+                  if (unlearned) {
+                    addKnowledge(unlearned);
+                  }
+                  onKillPlayer('Sacrificed to the Kaal Mani (Strategic Death)', true);
+                }}
                 style={{
                   flex: 1,
                   padding: '7px 4px',

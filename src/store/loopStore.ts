@@ -14,6 +14,7 @@ export interface LoopState {
   isPaused: boolean;
   hasLearnedNewThisLoop: boolean;
   latestLearnedText: string | null;
+  learnedEntriesThisLoop: string[];
 
   // Actions
   reset: (startTime?: number, defaultSpawn?: { x: number; y: number }) => void;
@@ -39,6 +40,7 @@ export const useLoopStore = create<LoopState>((set, get) => ({
   isPaused: false,
   hasLearnedNewThisLoop: false,
   latestLearnedText: null,
+  learnedEntriesThisLoop: [],
 
   reset: (startTime?: number, defaultSpawn = { x: 7, y: 10 }) => {
     const targetStartTime =
@@ -54,6 +56,7 @@ export const useLoopStore = create<LoopState>((set, get) => ({
       plates: {},
       hasLearnedNewThisLoop: false,
       latestLearnedText: null,
+      learnedEntriesThisLoop: [],
       isPaused: false,
     });
   },
@@ -89,9 +92,13 @@ export const useLoopStore = create<LoopState>((set, get) => ({
   },
 
   markLearned: (text?: string) => {
+    const current = get().learnedEntriesThisLoop;
+    const newEntry = text ?? 'A fragment of hidden truth.';
+    const updated = current.includes(newEntry) ? current : [...current, newEntry].slice(-2);
     set({
       hasLearnedNewThisLoop: true,
-      latestLearnedText: text ?? 'A fragment of hidden truth.',
+      learnedEntriesThisLoop: updated,
+      latestLearnedText: updated.join('\n\n'),
     });
   },
 

@@ -1,6 +1,7 @@
 import { CONFIG } from '../config';
 import { useLoopStore } from '../store/loopStore';
 import { useMemoryStore } from '../store/memoryStore';
+import { useUIStore } from '../store/uiStore';
 import { Camera } from './camera';
 import { assertWalkablePositions, findNearestWalkableTile } from './collision';
 import { ScreenShake } from './effects/screenShake';
@@ -184,9 +185,16 @@ export class GameEngine {
     }
 
     const activeMap = this.getActiveMap();
+    const uiState = useUIStore.getState();
 
-    // 4. Movement update
-    const moveDir = this.input.getMovementVector();
+    // Handle J key to toggle journal
+    if (this.input.wasActionJustPressed('journal') && !uiState.activeDialogue) {
+      uiState.toggleJournal();
+    }
+
+    // 4. Movement update (frozen while journal or dialogue is active)
+    const isPlayerLocked = uiState.journalOpen || uiState.activeDialogue !== null;
+    const moveDir = isPlayerLocked ? { dx: 0, dy: 0 } : this.input.getMovementVector();
     this.player.update(moveDir, dt, activeMap);
 
     // Sync player tile position with loopStore
@@ -213,15 +221,24 @@ export class GameEngine {
     }
     this.activeInteractable = closest;
 
-    // 7. Interaction action [E] (ignored for 0.4s after any scene transition)
+    // 7. Interaction action [E]
     if (this.transitionCooldown > 0) {
       this.transitionCooldown -= dt;
     }
     if (this.inkFadeTimer > 0) {
       this.inkFadeTimer -= dt;
     }
+    if (uiState.interactionIgnoreTimer > 0) {
+      uiState.setInteractionIgnoreTimer(Math.max(0, uiState.interactionIgnoreTimer - dt));
+    }
 
-    if (this.input.wasActionJustPressed('interact') && this.activeInteractable && this.transitionCooldown <= 0) {
+    const canInteract =
+      this.transitionCooldown <= 0 &&
+      uiState.interactionIgnoreTimer <= 0 &&
+      !uiState.journalOpen &&
+      !uiState.activeDialogue;
+
+    if (this.input.wasActionJustPressed('interact') && this.activeInteractable && canInteract) {
       this.triggerInteraction(this.activeInteractable);
     }
 
@@ -253,6 +270,11 @@ export class GameEngine {
   }
 
   private triggerInteraction(interactable: Interactable): void {
+    if (interactable.id === 'npc_bhima') {
+      const started = useUIStore.getState().startDialogue('bhima');
+      if (started) return;
+    }
+
     if (interactable.type === 'hatch' && interactable.targetScene && interactable.targetPosition) {
       this.scene = interactable.targetScene;
       useLoopStore.getState().setScene(this.scene);
