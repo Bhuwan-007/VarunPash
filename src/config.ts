@@ -19,6 +19,25 @@ export const CONFIG = {
   TILE_SIZE: 96,        // 32 * 3 pixels
 } as const;
 
+/**
+ * Pure function: calculates the loop's starting shipTime based strictly on deathCount.
+ * RULES.md section 2: deathCount * CONFIG.RESPAWN_SHIFT.
+ * Nothing may compute the respawn from current shipTime.
+ */
+export function startTimeForDeaths(deathCount: number): number {
+  return Math.max(0, deathCount) * CONFIG.RESPAWN_SHIFT;
+}
+
+// Dev-only unit test assertions
+if (import.meta.env.DEV) {
+  console.assert(startTimeForDeaths(0) === 0, 'startTimeForDeaths(0) must equal 0');
+  console.assert(startTimeForDeaths(1) === 30, 'startTimeForDeaths(1) must equal 30');
+  console.assert(startTimeForDeaths(2) === 60, 'startTimeForDeaths(2) must equal 60');
+  console.assert(startTimeForDeaths(3) === 90, 'startTimeForDeaths(3) must equal 90');
+  console.assert(startTimeForDeaths(20) === 600, 'startTimeForDeaths(20) must equal 600');
+}
+
+
 export const PALETTE = {
   Abyss: '#0b1320',      // backgrounds, sea at night
   Tar: '#07090f',        // outlines, shadows

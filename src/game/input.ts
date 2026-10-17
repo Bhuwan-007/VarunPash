@@ -39,7 +39,15 @@ export class InputManager {
     return this.keysDown.has(key.toLowerCase());
   }
 
-  public wasActionJustPressed(action: 'interact' | 'journal' | 'escape'): boolean {
+  public wasActionJustPressed(
+    action: 'interact' | 'journal' | 'escape' | 'debugRestart' | 'debugTimeScale'
+  ): boolean {
+    if (action === 'debugRestart') {
+      return Boolean(import.meta.env.DEV) && this.justPressed.has('r');
+    }
+    if (action === 'debugTimeScale') {
+      return Boolean(import.meta.env.DEV) && this.justPressed.has('t');
+    }
     let pressed = false;
     if (action === 'interact') {
       pressed = this.justPressed.has('e');
