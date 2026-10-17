@@ -106,10 +106,10 @@ handleDeath(cause):
 ## 7. Dialogue system
 ```json
 {
-  "npc": "brine",
+  "npc": "bhima",
   "lines": [
     { "id": "b1", "text": "...", "requires": [], "role": null, "minLoop": 0 },
-    { "id": "b_gossip", "text": "...", "requires": ["K_BRINE_GOSSIP"], "role": "quartermaster", "grants": ["K_..."] }
+    { "id": "b_gossip", "text": "...", "requires": ["K_BHIMA_GOSSIP"], "role": "quartermaster", "grants": ["K_..."] }
   ]
 }
 ```
@@ -126,13 +126,13 @@ Select the highest-priority line whose `requires` are all satisfied. Lines may `
 - Sprite sheets: 32x32 tiles, drawn at integer scale (3x), `image-rendering: pixelated`.
 
 ## 10. Map approach
-- Two scenes: `deck` (main deck, captain's cabin, quartermaster's quarters, galley, upper deck with listening grate) and `hold` (relic, statue, gold, lifeboat winch is on deck). Hatch tiles transition scenes.
+- Two scenes: `deck` (main deck, nakhuda's cabin, quartermaster's quarters, galley, upper deck with listening grate) and `hold` (relic, statue, gold, lifeboat winch is on deck). Hatch tiles transition scenes.
 - Maps are tile grids in code; zones (restricted areas, plates, port-side lethal zone) are named rectangles.
 - Starting layout guide for the deck (rows are top to bottom, bow on the left):
 ```
 ################################
 #BBBB....................SSSSSS#   B = bow rail, S = stern
-#B.....G.................C....S#   G = galley, C = captain cabin door
+#B.....G.................C....S#   G = galley, C = nakhuda cabin door
 #.....................Q.....S##   Q = quartermaster's quarters
 #...P..........H.........W...  #   P = port cannons, H = hatch, W = helm
 #...P....................L....#   L = lifeboats (starboard)

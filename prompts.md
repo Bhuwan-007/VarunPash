@@ -15,7 +15,7 @@
 "Implement MemoryStore, LoopStore and UIStore per ARCHITECTURE.md section 3 (persist MemoryStore in try/catch). Implement loopManager: ship time driven by the game loop (not setInterval), death handling, respawn at `deathCount * RESPAWN_SHIFT`, strategic vs wasted death detection, DeathToast UI, HUD with loop numeral, countdown and 20 tally marks. Add a debug panel with the controls from ARCHITECTURE.md section 12. Add a test button that kills the player."
 
 ### P3: Journal and dialogue
-"Implement the journal (RULES.md section 7, FEEL.md section 8): tabs Clues, Tide Table, People, Codes, opened with J, pausing the clock. Implement the dialogue system from ARCHITECTURE.md section 7 with `requires`, `role`, `minLoop` and `grants`. Add the dialogue box with a portrait placeholder. Add Bhima with 4 lines as a test, one gated by `K_BRINE_GOSSIP`."
+"Implement the journal (RULES.md section 7, FEEL.md section 8): tabs Clues, Tide Table, People, Codes, opened with J, pausing the clock. Implement the dialogue system from ARCHITECTURE.md section 7 with `requires`, `role`, `minLoop` and `grants`. Add the dialogue box with a portrait placeholder. Add Bhima with 4 lines as a test, one gated by `K_BHIMA_GOSSIP`."
 
 ### P4: Events and NPC schedules
 "Implement the eventScheduler and npcSchedule from RULES.md sections 6 and 10 for ship time: calm, gull omen at 355, mutiny at 360, Makara at 480, sinking at 600. Events that have already passed at spawn must start in their 'in progress' state. Add the 5 NPCs as colored placeholder sprites with the movement and behavior described. Add death causes: Nakhuda shoots intruders, Kedar stabs, Makara eats port side, drowning."
@@ -30,7 +30,7 @@
 "Implement the Hero's Sacrifice ending per RULES.md section 9, the lifeboat winch (Winch Plate held 10s), chanting at the relic, and the cutscene system from ARCHITECTURE.md section 8 with the `ending_hero` script from PROMPTS.md Part B. Add the statue in the hold from loop 1."
 
 ### P8: Remaining endings
-"Implement Coward's End and Mutineer's Reign per RULES.md section 9 with cutscenes `ending_coward` and `ending_mutineer`. Then the Drowned Loop at the 20th death with `ending_drowned`."
+"Implement Coward's End and Mutineer's Reign per RULES.md section 9 with cutscenes `ending_coward` and `ending_mutineer` (Mutineer's Reign triggers immediately when Makara is repelled). Then the Drowned Loop at the 20th death with `ending_drowned`."
 
 ### P9: Ghost and plates
 "Implement ghostRecorder and Ghost entity (ARCHITECTURE.md section 6) and plates (RULES.md section 8): Winch Plate and Helm Plate activate when the player or ghost stands on them. Ghost is intangible, translucent Tide Glow."

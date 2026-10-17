@@ -56,22 +56,22 @@ If time runs out, ship what is finished and playable. Never leave a half-wired f
 ## 6. Roles (assigned randomly per new game)
 | Role | Starts with | Strength | Weakness |
 |---|---|---|---|
-| Navigator | The Map | Unlocks the helm, sees the hidden stern hatch, Captain trusts you | Cannot win fights |
+| Navigator | The Map | Unlocks the helm, sees the hidden stern hatch, Nakhuda trusts you | Cannot win fights |
 | Quartermaster | Armory Key, Hold Key, 6 coins | Can fight, direct access to armory and hold | Crew demand bribes to talk or move |
 | Deckhand | Nothing | Vent grates bypass locked doors, eavesdrops unseen | Ignored by authority, weakest social access |
 
 ## 7. Cast (5 NPCs)
-- **Captain Maren Thorne**: locked in cabin, paranoid, shoots intruders.
-- **First Mate Corvin Voss**: the mutineer, also remembers the loops.
-- **Brine**: the cook, gossip, sells information.
-- **Gunner Ines Calloway**: runs the port cannons, loyal to the Captain.
-- **Bosun Hale**: guards the lifeboats, bribable.
+- **Nakhuda Thorne**: locked in cabin, paranoid, shoots intruders.
+- **First Mate Kedar Voss**: the mutineer, also remembers the loops.
+- **Bhima**: the cook, gossip, sells information.
+- **Gunner Isha Calloway**: runs the port cannons, loyal to the Nakhuda.
+- **Bosun Hari**: guards the lifeboats, bribable.
 
 ## 8. Endings (5)
 1. **Coward's End (bad):** row away alone before the Makara. Loop breaks, you are alone.
-2. **Mutineer's Reign (neutral/bad):** side with Corvin, survive, then he locks you in the brig.
+2. **Mutineer's Reign (neutral/bad):** side with Kedar, Makara is repelled by his cannons, then he locks you in the brig.
 3. **Hero's Sacrifice (bittersweet):** chant from inside the hold while the crew escapes. You become the statue.
-4. **Golden Path (perfect):** bribe Corvin with hold gold, expose the Makara's throat, read the chant from the upper deck. The statue crumbles to sand.
+4. **Golden Path (perfect):** bribe Kedar with hold gold, expose the Makara's throat, read the chant from the upper deck. The statue crumbles to sand.
 5. **The Drowned Loop (hidden, 20 deaths):** you spawn as the ship goes down and are petrified without choosing. The loop starts again.
 
 Exact trigger conditions are in RULES.md. Cinematic scripts are in PROMPTS.md.
