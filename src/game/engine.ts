@@ -2,6 +2,7 @@ import { CONFIG } from '../config';
 import { useLoopStore } from '../store/loopStore';
 import { useMemoryStore } from '../store/memoryStore';
 import { Camera } from './camera';
+import { assertWalkablePositions, findNearestWalkableTile } from './collision';
 import { ScreenShake } from './effects/screenShake';
 import { Player, PlayerState } from './entities/player';
 import { InputManager } from './input';
@@ -29,6 +30,7 @@ export interface ReadonlyGameState {
   readonly frameTime: number;
   readonly shipTime: number;
   readonly deathCount: number;
+  readonly inkFadeAlpha: number;
 }
 
 export class GameEngine {
@@ -45,6 +47,10 @@ export class GameEngine {
   private activeInteractable: Interactable | null = null;
   private messageBanner: string | null = null;
   private messageTimer: number = 0;
+
+  private transitionCooldown: number = 0;
+  private inkFadeTimer: number = 0;
+  private readonly INK_FADE_DURATION: number = 0.4;
 
   private isRunning: boolean = false;
   private lastTimestamp: number = 0;
@@ -63,8 +69,18 @@ export class GameEngine {
     this.deckMap = createDeckMap();
     this.holdMap = createHoldMap();
 
-    // Start player at initial deck spawn
-    this.player = new Player(this.deckMap.spawnPosition.x, this.deckMap.spawnPosition.y);
+    // Dev-only startup assertion: ensure all spawn and transition points are walkable
+    if (import.meta.env.DEV) {
+      assertWalkablePositions(this.deckMap, this.holdMap);
+    }
+
+    // Start player at safe initial deck spawn
+    const safeSpawn = findNearestWalkableTile(
+      this.deckMap,
+      this.deckMap.spawnPosition.x,
+      this.deckMap.spawnPosition.y
+    );
+    this.player = new Player(safeSpawn.x, safeSpawn.y);
 
     // Initial camera placement
     const targetPxX = this.player.x * CONFIG.TILE_SIZE;
@@ -75,9 +91,13 @@ export class GameEngine {
     this.loopManager.setCallbacks({
       onRespawn: (startScene, startPos) => {
         this.scene = startScene;
-        this.player.setPosition(startPos.x, startPos.y);
-
         const activeMap = this.getActiveMap();
+        const safePos = findNearestWalkableTile(activeMap, startPos.x, startPos.y);
+        this.player.setPosition(safePos.x, safePos.y);
+
+        this.transitionCooldown = 0.4;
+        this.inkFadeTimer = this.INK_FADE_DURATION;
+
         this.camera.update(
           this.player.x * CONFIG.TILE_SIZE,
           this.player.y * CONFIG.TILE_SIZE,
@@ -193,8 +213,15 @@ export class GameEngine {
     }
     this.activeInteractable = closest;
 
-    // 7. Interaction action [E]
-    if (this.input.wasActionJustPressed('interact') && this.activeInteractable) {
+    // 7. Interaction action [E] (ignored for 0.4s after any scene transition)
+    if (this.transitionCooldown > 0) {
+      this.transitionCooldown -= dt;
+    }
+    if (this.inkFadeTimer > 0) {
+      this.inkFadeTimer -= dt;
+    }
+
+    if (this.input.wasActionJustPressed('interact') && this.activeInteractable && this.transitionCooldown <= 0) {
       this.triggerInteraction(this.activeInteractable);
     }
 
@@ -230,14 +257,24 @@ export class GameEngine {
       this.scene = interactable.targetScene;
       useLoopStore.getState().setScene(this.scene);
 
-      this.player.setPosition(interactable.targetPosition.x, interactable.targetPosition.y);
+      const targetMap = this.getActiveMap();
+      const safePos = findNearestWalkableTile(
+        targetMap,
+        interactable.targetPosition.x,
+        interactable.targetPosition.y
+      );
 
-      const newMap = this.getActiveMap();
+      this.player.setPosition(safePos.x, safePos.y);
+
+      // Ignore 'E' for 0.4s and trigger brief ink transition fade
+      this.transitionCooldown = 0.4;
+      this.inkFadeTimer = this.INK_FADE_DURATION;
+
       this.camera.update(
         this.player.x * CONFIG.TILE_SIZE,
         this.player.y * CONFIG.TILE_SIZE,
-        newMap.width,
-        newMap.height,
+        targetMap.width,
+        targetMap.height,
         true
       );
 
@@ -253,6 +290,10 @@ export class GameEngine {
     const shakeOffset = this.screenShake.getOffset();
     const shipTime = useLoopStore.getState().shipTime;
     const deathCount = useMemoryStore.getState().deathCount;
+
+    // Ink fade curve: smooth sine wave over 0.4s duration
+    const progress = this.inkFadeTimer > 0 ? 1 - this.inkFadeTimer / this.INK_FADE_DURATION : 0;
+    const inkFadeAlpha = this.inkFadeTimer > 0 ? Math.sin(progress * Math.PI) : 0;
 
     return {
       scene: this.scene,
@@ -270,6 +311,7 @@ export class GameEngine {
       frameTime: this.frameTime,
       shipTime,
       deathCount,
+      inkFadeAlpha,
     };
   }
 }

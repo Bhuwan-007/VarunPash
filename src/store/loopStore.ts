@@ -31,7 +31,7 @@ export const useLoopStore = create<LoopState>((set, get) => ({
   shipTime: startTimeForDeaths(initialPersisted.deathCount ?? 0),
   inventory: [],
   npcStates: {},
-  playerPos: { x: 8, y: 4 }, // Tile coordinates on main deck
+  playerPos: { x: 7, y: 10 }, // Tile coordinates on main deck
   scene: 'deck',
   flags: {},
   plates: {},
@@ -40,7 +40,7 @@ export const useLoopStore = create<LoopState>((set, get) => ({
   hasLearnedNewThisLoop: false,
   latestLearnedText: null,
 
-  reset: (startTime?: number, defaultSpawn = { x: 8, y: 4 }) => {
+  reset: (startTime?: number, defaultSpawn = { x: 7, y: 10 }) => {
     const targetStartTime =
       startTime !== undefined ? startTime : startTimeForDeaths(useMemoryStore.getState().deathCount);
     set({

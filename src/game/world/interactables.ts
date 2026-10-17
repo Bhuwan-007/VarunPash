@@ -13,7 +13,15 @@ export type InteractableType =
   | 'relic'
   | 'statue'
   | 'gold'
-  | 'vent';
+  | 'vent'
+  | 'chest';
+
+export interface HighlightBounds {
+  width: number;
+  height: number;
+  offsetX?: number;
+  offsetY?: number;
+}
 
 export interface Interactable {
   id: string;
@@ -26,6 +34,7 @@ export interface Interactable {
   label: string;
   targetScene?: SceneId;
   targetPosition?: { x: number; y: number };
+  highlightSize?: HighlightBounds;
 }
 
 /**

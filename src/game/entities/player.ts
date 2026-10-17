@@ -53,8 +53,8 @@ export class Player {
       const deltaX = dx * moveDistance;
       const deltaY = dy * moveDistance;
 
-      // Resolve collision against solid tiles (0.28 half-width allows fitting through 1-tile passages)
-      const resolved = resolveMovement(map, this.x, this.y, deltaX, deltaY, 0.28, 0.28);
+      // Resolve collision against solid tiles (0.18 half-width allows fitting smoothly through doors and stairs)
+      const resolved = resolveMovement(map, this.x, this.y, deltaX, deltaY, 0.18, 0.14);
       this.x = resolved.x;
       this.y = resolved.y;
     } else {

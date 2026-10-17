@@ -74,9 +74,16 @@ export class LoopManager {
 
     uiStore.hideDeathToast();
 
+    // PLACEHOLDER: Currently silently resets game at 20 deaths.
+    // In P8, this placeholder will be replaced with the hidden Drowned Loop ending (four-panel cutscene) before resetting.
+    if (memoryState.deathCount >= CONFIG.MAX_DEATHS) {
+      this.fullResetGame();
+      return;
+    }
+
     // Calculate new loop starting shipTime = startTimeForDeaths(deathCount)
     const newStartTime = startTimeForDeaths(memoryState.deathCount);
-    const defaultDeckSpawn = { x: 8, y: 4 };
+    const defaultDeckSpawn = { x: 7, y: 10 };
 
     // Reset loop state for the next run
     loopState.reset(newStartTime, defaultDeckSpawn);
@@ -103,7 +110,7 @@ export class LoopManager {
     this.isDying = false;
 
     const currentStartTime = startTimeForDeaths(memoryState.deathCount);
-    const defaultDeckSpawn = { x: 8, y: 4 };
+    const defaultDeckSpawn = { x: 7, y: 10 };
 
     loopState.reset(currentStartTime, defaultDeckSpawn);
 
@@ -133,7 +140,7 @@ export class LoopManager {
     this.isDying = false;
 
     // 3. Reset loop store to 0 (deathCount = 0 -> startTime = 0)
-    const defaultDeckSpawn = { x: 8, y: 4 };
+    const defaultDeckSpawn = { x: 7, y: 10 };
     loopState.reset(startTimeForDeaths(0), defaultDeckSpawn);
 
     // 4. Reposition player and camera to deck spawn

@@ -4,12 +4,13 @@ import { Interactable } from './interactables';
 /**
  * Hold layout:
  * Lower cargo hold beneath the deck where the Kaal Mani, petrified statue, and gold are located.
+ * Features an ascent staircase leading up to the main deck hatch, and a chained stern companionway stair at the far end.
  */
 const HOLD_ASCII = [
   '##################',
   '#................#',
-  '#..V.........T...#', // V = Vent/Grate, T = Statue
-  '#...H............#', // H = Hatch to deck
+  '#..V.........T..S#', // V = Vent/Grate, T = Statue, S = Stern Stairs
+  '#...H............#', // H = Ascent Stairs to deck hatch
   '#............K...#', // K = Kaal Mani Relic
   '#.........O......#', // O = Gold Chest
   '#................#',
@@ -31,6 +32,9 @@ export function createHoldMap(): GameMap {
           break;
         case 'H':
           row.push('hatch');
+          break;
+        case 'S':
+          row.push('door');
           break;
         case 'K':
           row.push('relic');
@@ -62,9 +66,19 @@ export function createHoldMap(): GameMap {
       x: 4,
       y: 3,
       type: 'hatch',
-      label: 'Climb Ladder to Deck',
+      label: 'Climb Stairs to Deck',
       targetScene: 'deck',
-      targetPosition: { x: 15, y: 4 },
+      targetPosition: { x: 10.5, y: 11.5 }, // Top of stairs beside the deck hatch
+      highlightSize: { width: 0.7, height: 0.8, offsetX: 0.15, offsetY: 0.1 },
+    },
+    {
+      id: 'hold_stern_stairs',
+      scene: 'hold',
+      x: 16,
+      y: 2,
+      type: 'door',
+      label: "Navigator's Stern Companionway (Chained & Padlocked)",
+      highlightSize: { width: 0.7, height: 0.8, offsetX: 0.15, offsetY: 0.1 },
     },
     {
       id: 'relic_kaal_mani',
@@ -73,6 +87,7 @@ export function createHoldMap(): GameMap {
       y: 4,
       type: 'relic',
       label: 'Examine Kaal Mani (Humming Teal Crystal)',
+      highlightSize: { width: 0.6, height: 0.6, offsetX: 0.2, offsetY: 0.2 },
     },
     {
       id: 'statue_figure',
@@ -81,6 +96,7 @@ export function createHoldMap(): GameMap {
       y: 2,
       type: 'statue',
       label: 'Examine Petrified Statue',
+      highlightSize: { width: 0.6, height: 0.7, offsetX: 0.2, offsetY: 0.15 },
     },
     {
       id: 'hold_gold_chest',
@@ -89,6 +105,7 @@ export function createHoldMap(): GameMap {
       y: 5,
       type: 'gold',
       label: 'Locked Chest of Hold Gold',
+      highlightSize: { width: 0.7, height: 0.6, offsetX: 0.15, offsetY: 0.2 },
     },
     {
       id: 'hold_vent_grate',
@@ -97,6 +114,7 @@ export function createHoldMap(): GameMap {
       y: 2,
       type: 'vent',
       label: 'Ventilation Grate',
+      highlightSize: { width: 0.65, height: 0.65, offsetX: 0.18, offsetY: 0.18 },
     },
   ];
 
@@ -106,7 +124,7 @@ export function createHoldMap(): GameMap {
     width,
     height,
     tiles,
-    spawnPosition: { x: 5, y: 3 },
+    spawnPosition: { x: 4.5, y: 4.0 }, // Foot of the stairs in the hold
     interactables,
   };
 }
