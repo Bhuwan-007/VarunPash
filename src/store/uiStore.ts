@@ -17,6 +17,7 @@ export interface ActiveDialogueSession {
 }
 
 export interface UIState {
+  gameScreen: 'title' | 'intro' | 'game';
   deathToast: DeathToastData | null;
   debugPanelOpen: boolean;
   journalOpen: boolean;
@@ -24,8 +25,10 @@ export interface UIState {
   activeCutsceneId: string | null;
   activeDialogue: ActiveDialogueSession | null;
   interactionIgnoreTimer: number;
+  hasDismissedControlsHint: boolean;
 
   // Actions
+  setGameScreen: (screen: 'title' | 'intro' | 'game') => void;
   showDeathToast: (data: Omit<DeathToastData, 'visible'>) => void;
   hideDeathToast: () => void;
   toggleDebugPanel: () => void;
@@ -37,11 +40,13 @@ export interface UIState {
   startDialogue: (npcId: string) => boolean;
   closeDialogue: () => void;
   setInteractionIgnoreTimer: (duration: number) => void;
+  dismissControlsHint: () => void;
 }
 
 let pulseTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export const useUIStore = create<UIState>((set, get) => ({
+  gameScreen: 'title', // Start on Title Screen per Prompt Issue 6
   deathToast: null,
   debugPanelOpen: true, // Visible for dev testing per P2
   journalOpen: false,
@@ -49,6 +54,10 @@ export const useUIStore = create<UIState>((set, get) => ({
   activeCutsceneId: null,
   activeDialogue: null,
   interactionIgnoreTimer: 0,
+  hasDismissedControlsHint: false,
+
+  setGameScreen: (screen) => set({ gameScreen: screen }),
+  dismissControlsHint: () => set({ hasDismissedControlsHint: true }),
 
   showDeathToast: (data) => {
     set({

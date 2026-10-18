@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { CONFIG, PALETTE, startTimeForDeaths } from '../config';
 import { addKnowledge } from '../game/systems/knowledge';
+import { NpcScheduler } from '../game/systems/npcScheduler';
 import { useLoopStore } from '../store/loopStore';
 import { useMemoryStore } from '../store/memoryStore';
 import { useUIStore } from '../store/uiStore';
@@ -30,11 +31,29 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
   const knowledge = useMemoryStore((s) => s.knowledge);
   const setPlayerRole = useMemoryStore((s) => s.setPlayerRole);
 
+  const [npcLogEnabled, setNpcLogEnabled] = useState(false);
+
+  // 1-second interval NPC position & activity logger
+  useEffect(() => {
+    if (!npcLogEnabled) return;
+
+    const interval = setInterval(() => {
+      const curTime = useLoopStore.getState().shipTime;
+      const npcs = NpcScheduler.getAllNpcStates(curTime);
+      const logStr = npcs
+        .map((n) => `${n.id}: (${n.x.toFixed(2)}, ${n.y.toFixed(2)}) ${n.scene} [${n.activity}]`)
+        .join(' | ');
+      console.log(`[NPC Log @ ${curTime.toFixed(1)}s] ${logStr}`);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [npcLogEnabled]);
 
   const testFlags = [
     'K_SAFE_CODE',
     'K_MUTINEER',
     'K_Makara_WEAKNESS',
+    'K_LEVIATHAN_WEAKNESS',
     'K_CHANT',
     'K_STATUE_TRUTH',
     'K_BHIMA_GOSSIP',
@@ -187,36 +206,92 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
           {/* Timeline Jump */}
           <div style={{ marginBottom: '12px' }}>
             <div style={{ fontSize: '11px', color: PALETTE.Ash, marginBottom: '6px' }}>JUMP SHIP TIME:</div>
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginBottom: '6px' }}>
+              {[
+                { label: '0s', time: 0 },
+                { label: '240s', time: 240 },
+                { label: '250s', time: 250 },
+                { label: '300s', time: 300 },
+                { label: '320s', time: 320 },
+                { label: '355s', time: 355 },
+                { label: '365s', time: 365 },
+                { label: '485s', time: 485 },
+              ].map(({ label, time }) => (
+                <button
+                  key={time}
+                  onClick={() => setShipTime(time)}
+                  style={{
+                    padding: '4px 2px',
+                    backgroundColor: PALETTE.Deepwater,
+                    color: PALETTE.Bone,
+                    border: '1px solid #1a4253',
+                    borderRadius: '2px',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* NPC Logger Toggle */}
+            <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
               <button
-                onClick={() => setShipTime(350)}
+                onClick={() => setNpcLogEnabled(!npcLogEnabled)}
                 style={{
                   flex: 1,
                   padding: '5px',
-                  backgroundColor: PALETTE.Deepwater,
-                  color: PALETTE.Bone,
+                  backgroundColor: npcLogEnabled ? PALETTE.Lantern : PALETTE.Deepwater,
+                  color: npcLogEnabled ? PALETTE.Tar : PALETTE.Bone,
                   border: '1px solid #1a4253',
                   borderRadius: '3px',
                   fontSize: '11px',
+                  fontWeight: npcLogEnabled ? 'bold' : 'normal',
                   cursor: 'pointer',
                 }}
               >
-                Jump 350s (Mutiny)
+                {npcLogEnabled ? '● NPC LOGGING (ON)' : '○ NPC LOG (OFF)'}
+              </button>
+            </div>
+
+            {/* Jump DeathCount */}
+            <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+              <button
+                onClick={() => {
+                  useMemoryStore.setState({ deathCount: 12 });
+                  onRestartLoop();
+                }}
+                style={{
+                  flex: 1,
+                  padding: '4px 2px',
+                  backgroundColor: PALETTE.Deepwater,
+                  color: PALETTE.Bone,
+                  border: '1px solid #1a4253',
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                Death 12 (360s)
               </button>
               <button
-                onClick={() => setShipTime(470)}
+                onClick={() => {
+                  useMemoryStore.setState({ deathCount: 16 });
+                  onRestartLoop();
+                }}
                 style={{
                   flex: 1,
-                  padding: '5px',
+                  padding: '4px 2px',
                   backgroundColor: PALETTE.Deepwater,
                   color: PALETTE.Bone,
                   border: '1px solid #1a4253',
-                  borderRadius: '3px',
-                  fontSize: '11px',
+                  borderRadius: '2px',
+                  fontSize: '10px',
                   cursor: 'pointer',
                 }}
               >
-                Jump 470s (Makara)
+                Death 16 (480s)
               </button>
             </div>
           </div>

@@ -2,10 +2,11 @@ import { create } from 'zustand';
 
 export interface JournalEntry {
   id: string;
-  tab: string;
+  tab: 'Clues' | 'Tide Table' | 'People' | 'Codes' | string;
   text: string;
-  loop: number;
+  loop?: number;
   title?: string;
+  npcId?: string;
   code?: string;
   tideTime?: string;
 }
@@ -21,6 +22,7 @@ export interface MemoryState {
   playerRole: 'navigator' | 'quartermaster' | 'deckhand' | null;
   knowledge: string[]; // flags from RULES.md
   journal: JournalEntry[];
+  unreadTabs: Record<string, boolean>;
   deathCount: number; // drives respawn offset
   endingsSeen: string[];
   ghost: GhostFrame[] | null; // previous loop only
@@ -30,6 +32,8 @@ export interface MemoryState {
 
   // Actions
   addKnowledge: (flag: string, entry?: JournalEntry) => boolean;
+  addJournalEntry: (entry: Omit<JournalEntry, 'loop'> & { loop?: number }) => boolean;
+  markTabRead: (tab: string) => void;
   recordDeath: (
     cause: string,
     newDiscovered?: boolean,
@@ -80,6 +84,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   playerRole: initialPersisted.playerRole ?? 'deckhand',
   knowledge: initialPersisted.knowledge ?? [],
   journal: initialPersisted.journal ?? [],
+  unreadTabs: {},
   deathCount: initialPersisted.deathCount ?? 0,
   endingsSeen: initialPersisted.endingsSeen ?? [],
   ghost: initialPersisted.ghost ?? null,
@@ -94,15 +99,55 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     }
 
     const nextKnowledge = [...state.knowledge, flag];
-    const nextJournal = entry ? [...state.journal, entry] : state.journal;
+    let nextJournal = state.journal;
+    let nextUnread = state.unreadTabs;
+
+    if (entry && !state.journal.some((e) => e.id === entry.id)) {
+      nextJournal = [...state.journal, entry];
+      nextUnread = { ...state.unreadTabs, [entry.tab]: true };
+    }
 
     set({
       knowledge: nextKnowledge,
       journal: nextJournal,
+      unreadTabs: nextUnread,
     });
 
     savePersistedState(get());
     return true;
+  },
+
+  addJournalEntry: (entry) => {
+    const state = get();
+    // Dedupe by id
+    if (state.journal.some((e) => e.id === entry.id)) {
+      return false;
+    }
+
+    const loopNumber = entry.loop ?? state.deathCount + 1;
+    const fullEntry: JournalEntry = {
+      ...entry,
+      loop: loopNumber,
+    };
+
+    const nextJournal = [...state.journal, fullEntry];
+    const nextUnread = { ...state.unreadTabs, [entry.tab]: true };
+
+    set({
+      journal: nextJournal,
+      unreadTabs: nextUnread,
+    });
+
+    savePersistedState(get());
+    return true;
+  },
+
+  markTabRead: (tab: string) => {
+    const state = get();
+    if (!state.unreadTabs[tab]) return;
+    const nextUnread = { ...state.unreadTabs };
+    delete nextUnread[tab];
+    set({ unreadTabs: nextUnread });
   },
 
   recordDeath: (
@@ -133,6 +178,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       playerRole: randomRole,
       knowledge: [],
       journal: [],
+      unreadTabs: {},
       deathCount: 0,
       endingsSeen: [],
       ghost: null,
@@ -140,6 +186,8 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       lastDeathRemembered: null,
       shipTimeAtDeath: null,
       addKnowledge: get().addKnowledge,
+      addJournalEntry: get().addJournalEntry,
+      markTabRead: get().markTabRead,
       recordDeath: get().recordDeath,
       newGame: get().newGame,
       setPlayerRole: get().setPlayerRole,
@@ -155,3 +203,22 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     savePersistedState(get());
   },
 }));
+
+// Expose dev console command window.journalDump()
+if (typeof window !== 'undefined') {
+  (window as unknown as { journalDump: () => void }).journalDump = () => {
+    const state = useMemoryStore.getState();
+    console.group(`=== VARUNPASH JOURNAL DUMP (${state.journal.length} entries) ===`);
+    console.log('Knowledge flags:', state.knowledge);
+    const tabs = ['Clues', 'Tide Table', 'People', 'Codes'];
+    for (const tab of tabs) {
+      const entries = state.journal.filter((e) => e.tab === tab);
+      console.group(`[Tab: ${tab}] (${entries.length} entries)`);
+      entries.forEach((e, idx) => {
+        console.log(`${idx + 1}. [${e.id}] ${e.title ? e.title + ' - ' : ''}"${e.text}" ${e.npcId ? `(NPC: ${e.npcId})` : ''}`);
+      });
+      console.groupEnd();
+    }
+    console.groupEnd();
+  };
+}

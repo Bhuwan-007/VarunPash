@@ -1,2 +1,70 @@
-{}
-
+{
+  "npc": "isha",
+  "name": "Gunner Isha Calloway",
+  "title": "Ship's Gunner",
+  "lines": [
+    {
+      "id": "isha_makara",
+      "text": "Look at the scar on its throat—that glowing iron! Someone harpooned this monster before us!",
+      "when": {
+        "timeMin": 480,
+        "timeMax": 600
+      },
+      "priority": 50,
+      "grants": ["K_Makara_WEAKNESS", "K_LEVIATHAN_WEAKNESS"],
+      "journalNote": "Isha saw a Tide Glow harpoon head lodged deep inside the Makara's armored gullet."
+    },
+    {
+      "id": "isha_calm",
+      "text": "Powder's dry. Guns are lashed. If the sea wants a fight, port broadside is ready to answer.",
+      "when": {
+        "timeMin": 0,
+        "timeMax": 300
+      },
+      "priority": 10,
+      "journalNote": "Gunner Isha stands vigilant by the port battery, smelling of sulfur and sea salt."
+    },
+    {
+      "id": "isha_pre_mutiny",
+      "text": "Kedar's hounds are prowling. Let them try the guns—they'll get a rammer through the teeth.",
+      "when": {
+        "timeMin": 300,
+        "timeMax": 359
+      },
+      "priority": 20,
+      "journalNote": "Isha suspects the crew is turning, but she holds her battery against all comers."
+    },
+    {
+      "id": "isha_mutiny",
+      "text": "Thorne's dead in his cabin. Mutineers everywhere. But I won't abandon my cannons for a traitor's flag.",
+      "when": {
+        "timeMin": 360,
+        "timeMax": 479
+      },
+      "priority": 30,
+      "journalNote": "Isha refuses to swear loyalty to Kedar. She stays glued to the port broadside."
+    },
+    {
+      "id": "isha_relic_hum",
+      "text": "Feel that vibration in the deck? It's coming from under the cargo grating. Not engine, not bilge. Something older.",
+      "when": {
+        "minLoop": 2,
+        "timeMin": 0,
+        "timeMax": 359
+      },
+      "priority": 25,
+      "journalNote": "Isha feels the Kaal Mani humming through the ship's timbers beneath the hold hatch."
+    },
+    {
+      "id": "isha_helm_coordination",
+      "text": "If we come about hard to port, I can bring all four cannons to bear on the monster. But someone has to hold the helm plate steady.",
+      "when": {
+        "timeMin": 360,
+        "timeMax": 479,
+        "flags": ["K_MUTINEER"]
+      },
+      "priority": 35,
+      "journalNote": "Isha says she can drive off the Leviathan if the helm plate is held steady while she fires."
+    }
+  ]
+}

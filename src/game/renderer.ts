@@ -2,6 +2,7 @@ import { CONFIG, PALETTE } from '../config';
 import { LightingEffect } from './effects/lightingEffect';
 import { WaterEffect } from './effects/waterEffect';
 import { ReadonlyGameState } from './engine';
+import { NpcScheduleState } from './systems/npcScheduler';
 import { TileType } from './world/deckMap';
 
 /**
@@ -21,6 +22,7 @@ export class GameRenderer {
   private ctx: CanvasRenderingContext2D;
   private waterEffect: WaterEffect;
   private lightingEffect: LightingEffect;
+  private lastMakaraLogSec: number = -1;
 
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
@@ -32,6 +34,14 @@ export class GameRenderer {
     const { ctx } = this;
     const { map, player, camera, shakeOffset, activeInteractable, messageBanner, frameTime } = state;
     const { TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT } = CONFIG;
+
+    // Dev log: "Makara rendered: yes/no" once per second (Prompt Issue 5)
+    const currentSec = Math.floor(state.shipTime);
+    if (currentSec !== this.lastMakaraLogSec) {
+      this.lastMakaraLogSec = currentSec;
+      const makaraRendered = state.scene === 'deck' && state.shipTime >= 470;
+      console.log(`Makara rendered: ${makaraRendered ? 'yes' : 'no'}`);
+    }
 
     // Apply screen shake offset to effective camera viewport
     const effectiveCamX = camera.x - shakeOffset.offsetX;
@@ -79,12 +89,81 @@ export class GameRenderer {
     }
 
     // --- LAYER 3: Entities (Player & NPCs) ---
+    // 3a. Makara Leviathan: telegraph shadow/swells (470-479) or full breach (480+)
     if (state.scene === 'deck') {
-      const bhimaX = 5.5 * TILE_SIZE - effectiveCamX;
-      const bhimaY = 13.5 * TILE_SIZE - effectiveCamY;
-      this.drawBhimaNPC(bhimaX, bhimaY);
+      if (state.shipTime >= 470 && state.shipTime < 480) {
+        this.drawMakaraTelegraph(ctx, frameTime);
+      } else if (state.shipTime >= 480) {
+        this.drawMakaraBreach(ctx, frameTime, state.shipTime);
+      }
     }
 
+    // 3b. Mutineers (hooded, grey, no red sash)
+    for (const m of state.mutineers) {
+      if (m.scene === state.scene) {
+        this.drawMutineerSilhouette(m.x * TILE_SIZE - effectiveCamX, m.y * TILE_SIZE - effectiveCamY, m.facing);
+      }
+    }
+
+    // 3c. Scheduled NPCs (dev assertion logs any duplicate NPC drawn in a single frame)
+    const drawnNpcIds = new Set<string>();
+    for (const npc of state.npcs) {
+      if (npc.scene === state.scene && npc.activity !== 'in_cabin') {
+        if (drawnNpcIds.has(npc.id)) {
+          console.error(
+            `[DevAssertion Failed] Duplicate NPC drawn in single frame: NPC "${npc.id}" drawn more than once in scene "${state.scene}"!`
+          );
+          continue;
+        }
+        drawnNpcIds.add(npc.id);
+
+        const nx = npc.x * TILE_SIZE - effectiveCamX;
+        const ny = npc.y * TILE_SIZE - effectiveCamY;
+
+        switch (npc.id) {
+          case 'nakhuda':
+            this.drawNakhudaNPC(nx, ny, npc);
+            break;
+          case 'kedar':
+            this.drawKedarNPC(nx, ny, npc, state.shipTime);
+            break;
+          case 'bhima':
+            this.drawBhimaNPC(nx, ny, npc);
+            break;
+          case 'isha':
+            this.drawIshaNPC(nx, ny, npc, state.eventStatus.makaraActive, frameTime);
+            break;
+          case 'hari':
+            this.drawHariNPC(nx, ny, npc);
+            break;
+        }
+
+        // Proximity name badge pill (within 2.5 tiles)
+        const distToPlayer = Math.hypot(player.x - npc.x, player.y - npc.y);
+        if (distToPlayer <= 2.5 && !npc.isDead) {
+          this.drawNpcNamePill(nx, ny, npc.name, npc.role);
+        }
+      }
+    }
+
+    // 3c2. Floating Event BARKS above NPC head (2.5s duration)
+    if (state.barks && state.barks.length > 0) {
+      for (const bark of state.barks) {
+        const npc = state.npcs.find((n) => n.id === bark.npcId);
+        if (npc && npc.scene === state.scene && npc.activity !== 'in_cabin') {
+          const nx = npc.x * TILE_SIZE - effectiveCamX;
+          const ny = npc.y * TILE_SIZE - effectiveCamY;
+          this.drawNpcBark(nx, ny, bark.text);
+        }
+      }
+    }
+
+    // 3d. Gull Omen on main mast (Deck scene, 355-360)
+    if (state.scene === 'deck' && state.eventStatus.gullPresent) {
+      this.drawGullOmen(8.0 * TILE_SIZE - effectiveCamX, 9.0 * TILE_SIZE - effectiveCamY - 20, frameTime);
+    }
+
+    // 3e. Player
     const playerScreenX = player.x * TILE_SIZE - effectiveCamX;
     const playerScreenY = player.y * TILE_SIZE - effectiveCamY;
     this.drawPlayer(player, playerScreenX, playerScreenY);
@@ -93,6 +172,16 @@ export class GameRenderer {
     const glowTargets: { x: number; y: number; color: string; radius: number }[] = [];
 
     if (state.scene === 'deck') {
+      // Makara glowing harpoon in throat (Tide Glow #5fd3c4)
+      if (state.eventStatus.makaraActive) {
+        glowTargets.push({
+          x: 2.2 * TILE_SIZE - effectiveCamX,
+          y: 13.5 * TILE_SIZE - effectiveCamY,
+          color: 'rgba(95, 211, 196, 0.75)',
+          radius: 200,
+        });
+      }
+
       // Deck storm lantern near cargo hatch (x: 10, y: 12)
       glowTargets.push({
         x: 10.5 * TILE_SIZE - effectiveCamX,
@@ -134,6 +223,34 @@ export class GameRenderer {
     }
 
     this.lightingEffect.draw(ctx, playerScreenX, playerScreenY, glowTargets);
+
+    // 4b. Port lethal zone danger pulse (Deck scene, 480+)
+    if (state.scene === 'deck' && state.eventStatus.portLethal) {
+      const pulse = 0.5 + 0.5 * Math.sin(frameTime * 6);
+      ctx.save();
+      ctx.fillStyle = `rgba(178, 58, 58, ${0.12 + pulse * 0.08})`;
+      const portX = 4 * TILE_SIZE - effectiveCamX;
+      ctx.fillRect(portX, 0, 1.8 * TILE_SIZE, CONFIG.CANVAS_HEIGHT);
+      ctx.restore();
+    }
+
+    // 4c. Mutiny Blood Rust atmospheric vignette (Deck scene, 360+)
+    if (state.scene === 'deck' && state.eventStatus.mutinyActive) {
+      ctx.save();
+      const grad = ctx.createRadialGradient(
+        CONFIG.CANVAS_WIDTH / 2,
+        CONFIG.CANVAS_HEIGHT / 2,
+        280,
+        CONFIG.CANVAS_WIDTH / 2,
+        CONFIG.CANVAS_HEIGHT / 2,
+        700
+      );
+      grad.addColorStop(0, 'rgba(178, 58, 58, 0)');
+      grad.addColorStop(1, 'rgba(178, 58, 58, 0.22)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+      ctx.restore();
+    }
 
     // --- LAYER 5: In-world Floating Prompts [E] ---
     if (activeInteractable) {
@@ -1059,43 +1176,208 @@ export class GameRenderer {
   }
 
   /**
-   * Bhima the Cook NPC (Procedural visual sprite for P3 test)
-   * Stained canvas apron over coarse tunic, earring, ladle/spoon.
+   * Nakhuda Thorne: tall, ornate turban with gold plume, dark teal angarakha, pistol.
+   * If dead (360+): drawn collapsed in blood rust pool.
    */
-  private drawBhimaNPC(bx: number, by: number): void {
+  private drawNakhudaNPC(nx: number, ny: number, npc: NpcScheduleState): void {
+    const { ctx } = this;
+    ctx.save();
+
+    if (npc.isDead) {
+      // 1. Blood Rust pool
+      ctx.fillStyle = 'rgba(178, 58, 58, 0.7)';
+      ctx.beginPath();
+      ctx.ellipse(nx, ny + 10, 24, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. Fallen body in dark teal angarakha
+      ctx.fillStyle = '#16282d';
+      ctx.fillRect(nx - 18, ny - 6, 36, 16);
+      ctx.strokeStyle = PALETTE.Tar;
+      ctx.lineWidth = 1.6;
+      ctx.strokeRect(nx - 18, ny - 6, 36, 16);
+
+      // 3. Fallen ornate turban
+      ctx.fillStyle = '#dcd5c0';
+      ctx.beginPath();
+      ctx.ellipse(nx - 16, ny + 2, 11, 9, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Dropped pistol
+      ctx.fillStyle = PALETTE.Lantern;
+      ctx.fillRect(nx + 14, ny + 6, 10, 4);
+      ctx.fillStyle = '#18120c';
+      ctx.fillRect(nx + 18, ny + 10, 4, 6);
+
+      ctx.restore();
+      return;
+    }
+
+    // Drop shadow
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(nx, ny + 18, 16, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Boots
+    ctx.fillStyle = '#151318';
+    ctx.fillRect(nx - 9, ny + 12, 6, 8);
+    ctx.fillRect(nx + 3, ny + 12, 6, 8);
+
+    // Dark teal Angarakha coat
+    ctx.fillStyle = '#162f36';
+    ctx.fillRect(nx - 13, ny - 16, 26, 28);
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.6;
+    ctx.strokeRect(nx - 13, ny - 16, 26, 28);
+
+    // Ornate gold waist sash & pistol grip
+    ctx.fillStyle = PALETTE.Lantern;
+    ctx.fillRect(nx - 14, ny + 1, 28, 4);
+    ctx.fillStyle = '#18120c';
+    ctx.fillRect(nx + 6, ny - 2, 5, 8); // Holstered pistol grip
+
+    // Tall Head & Ornate Turban with crest
+    ctx.fillStyle = '#ded6c1';
+    ctx.beginPath();
+    ctx.arc(nx, ny - 25, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // Gold turban brooch
+    ctx.fillStyle = PALETTE.Lantern;
+    ctx.beginPath();
+    ctx.arc(nx, ny - 32, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Grey beard
+    ctx.fillStyle = '#9aa1a8';
+    ctx.beginPath();
+    ctx.moveTo(nx - 7, ny - 20);
+    ctx.lineTo(nx, ny - 12);
+    ctx.lineTo(nx + 7, ny - 20);
+    ctx.fill();
+
+    // Eyes with scar
+    ctx.fillStyle = PALETTE.Lantern;
+    ctx.fillRect(nx + 2, ny - 23, 2, 2);
+    // Scar across left eye in blood rust
+    ctx.strokeStyle = PALETTE.BloodRust;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(nx - 6, ny - 27);
+    ctx.lineTo(nx - 2, ny - 19);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  /**
+   * First Mate Kedar Voss: lean, crimson sash, gold tooth glint, drawn dagger.
+   */
+  private drawKedarNPC(kx: number, ky: number, npc: NpcScheduleState, shipTime: number): void {
+    const { ctx } = this;
+    ctx.save();
+
+    // Drop shadow
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(kx, ky + 18, 14, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Boots
+    ctx.fillStyle = '#18120c';
+    ctx.fillRect(kx - 8, ky + 12, 5, 8);
+    ctx.fillRect(kx + 3, ky + 12, 5, 8);
+
+    // Lean dark angarakha coat
+    ctx.fillStyle = '#221e25';
+    ctx.fillRect(kx - 11, ky - 15, 22, 27);
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.6;
+    ctx.strokeRect(kx - 11, ky - 15, 22, 27);
+
+    // Prominent Blood Rust crimson waist sash
+    ctx.fillStyle = PALETTE.BloodRust;
+    ctx.fillRect(kx - 12, ky + 1, 24, 5);
+    ctx.fillRect(kx + 5, ky + 6, 4, 9); // Sash tail
+
+    // Head with slicked dark hair
+    ctx.fillStyle = '#181216';
+    ctx.beginPath();
+    ctx.arc(kx, ky - 23, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // Face
+    ctx.fillStyle = '#2a221c';
+    ctx.beginPath();
+    ctx.arc(kx, ky - 21, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Gold tooth / earring glint
+    ctx.fillStyle = PALETTE.Lantern;
+    ctx.fillRect(kx - 2, ky - 19, 2, 2);
+    ctx.fillRect(kx + 6, ky - 22, 2, 2);
+
+    // Drawn curved steel dagger at 340+
+    if (shipTime >= 340) {
+      ctx.strokeStyle = '#cdd6db';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(kx - 10, ky + 5);
+      ctx.lineTo(kx - 16, ky - 4);
+      ctx.stroke();
+
+      ctx.fillStyle = PALETTE.Lantern;
+      ctx.fillRect(kx - 11, ky + 4, 3, 3); // Brass guard
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Bhima the Cook NPC: wide round body, stained bone canvas apron, wooden spoon.
+   */
+  private drawBhimaNPC(bx: number, by: number, _npc?: NpcScheduleState): void {
     const { ctx } = this;
     ctx.save();
 
     // 1. Drop shadow
     ctx.fillStyle = 'rgba(7, 9, 15, 0.45)';
     ctx.beginPath();
-    ctx.ellipse(bx, by + 18, 16, 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(bx, by + 18, 18, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // 2. Heavy work boots
     ctx.fillStyle = '#221a14';
-    ctx.fillRect(bx - 9, by + 12, 7, 8);
-    ctx.fillRect(bx + 2, by + 12, 7, 8);
+    ctx.fillRect(bx - 10, by + 12, 7, 8);
+    ctx.fillRect(bx + 3, by + 12, 7, 8);
 
     // 3. Stained Canvas Apron & Cook Robes
     ctx.fillStyle = '#3c2e22'; // Dark tunic underneath
-    ctx.fillRect(bx - 14, by - 14, 28, 26);
+    ctx.fillRect(bx - 15, by - 14, 30, 26);
 
     ctx.fillStyle = '#d4c5a9'; // Bone stained apron
-    ctx.fillRect(bx - 10, by - 10, 20, 22);
+    ctx.fillRect(bx - 11, by - 10, 22, 22);
 
     ctx.strokeStyle = PALETTE.Tar;
     ctx.lineWidth = 1.6;
-    ctx.strokeRect(bx - 10, by - 10, 20, 22);
+    ctx.strokeRect(bx - 11, by - 10, 22, 22);
 
     // Apron bib straps
     ctx.strokeStyle = '#8c7b64';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(bx - 7, by - 10);
-    ctx.lineTo(bx - 5, by - 14);
-    ctx.moveTo(bx + 7, by - 10);
-    ctx.lineTo(bx + 5, by - 14);
+    ctx.moveTo(bx - 8, by - 10);
+    ctx.lineTo(bx - 6, by - 14);
+    ctx.moveTo(bx + 8, by - 10);
+    ctx.lineTo(bx + 6, by - 14);
     ctx.stroke();
 
     // Grease & turmeric stains on apron
@@ -1106,9 +1388,9 @@ export class GameRenderer {
     ctx.fill();
 
     // 4. Head & Turban
-    ctx.fillStyle = '#a69076'; // Ochre/weathered cloth wrap
+    ctx.fillStyle = '#a69076';
     ctx.beginPath();
-    ctx.arc(bx, by - 23, 13, 0, Math.PI * 2);
+    ctx.arc(bx, by - 23, 14, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = PALETTE.Tar;
     ctx.lineWidth = 1.6;
@@ -1117,14 +1399,14 @@ export class GameRenderer {
     // Face shadow
     ctx.fillStyle = PALETTE.Tar;
     ctx.beginPath();
-    ctx.arc(bx, by - 21, 7.5, 0, Math.PI * 2);
+    ctx.arc(bx, by - 21, 8, 0, Math.PI * 2);
     ctx.fill();
 
     // Gold hoop earring in left ear
     ctx.strokeStyle = PALETTE.Lantern;
     ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.arc(bx - 8, by - 20, 2.5, 0, Math.PI * 2);
+    ctx.arc(bx - 9, by - 20, 2.5, 0, Math.PI * 2);
     ctx.stroke();
 
     // Eyes glinting
@@ -1134,10 +1416,532 @@ export class GameRenderer {
 
     // 5. Wooden Cook Spoon tucked in sash
     ctx.fillStyle = '#9c6f44';
-    ctx.fillRect(bx + 9, by - 8, 3, 18);
+    ctx.fillRect(bx + 10, by - 8, 3, 18);
     ctx.beginPath();
-    ctx.ellipse(bx + 10.5, by - 10, 4, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(bx + 11.5, by - 10, 4, 6, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.restore();
+  }
+
+  /**
+   * Gunner Isha Calloway: tall, braided hair, fitted vest, powder-burned forearms.
+   * At 480+: periodic cannon fire flash.
+   */
+  private drawIshaNPC(ix: number, iy: number, _npc: NpcScheduleState, isMakaraActive: boolean, frameTime: number): void {
+    const { ctx } = this;
+    ctx.save();
+
+    // Drop shadow
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(ix, iy + 18, 14, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Boots
+    ctx.fillStyle = '#1c1511';
+    ctx.fillRect(ix - 8, iy + 12, 5, 8);
+    ctx.fillRect(ix + 3, iy + 12, 5, 8);
+
+    // Fitted angarakha tunic with rolled sleeves
+    ctx.fillStyle = '#372a22';
+    ctx.fillRect(ix - 11, iy - 16, 22, 28);
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.6;
+    ctx.strokeRect(ix - 11, iy - 16, 22, 28);
+
+    // Leather belt with powder horn
+    ctx.fillStyle = '#18120c';
+    ctx.fillRect(ix - 12, iy + 1, 24, 4);
+    ctx.fillStyle = '#d4c5a9'; // Powder horn
+    ctx.beginPath();
+    ctx.arc(ix - 6, iy + 7, 4, 0, Math.PI * 1.5);
+    ctx.fill();
+
+    // Bare powder-burned forearms
+    ctx.fillStyle = '#7a5a40';
+    ctx.fillRect(ix - 14, iy - 6, 4, 12);
+    ctx.fillRect(ix + 10, iy - 6, 4, 12);
+
+    // Head with braided hair
+    ctx.fillStyle = '#18120c';
+    ctx.beginPath();
+    ctx.arc(ix, iy - 24, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // Braid trailing over shoulder
+    ctx.fillRect(ix + 7, iy - 20, 5, 16);
+
+    // Face
+    ctx.fillStyle = '#261b14';
+    ctx.beginPath();
+    ctx.arc(ix, iy - 22, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sharp focused eye glint
+    ctx.fillStyle = PALETTE.Lantern;
+    ctx.fillRect(ix - 4, iy - 23, 2, 2);
+
+    // Gunner sponge / rammer staff
+    ctx.fillStyle = '#5c432d';
+    ctx.fillRect(ix - 15, iy - 28, 3, 38);
+    ctx.fillStyle = '#9e8975'; // Wool sponge head
+    ctx.fillRect(ix - 17, iy - 33, 7, 6);
+
+    // Cannon fire flash when Makara is active (every 4 seconds for 0.3s)
+    if (isMakaraActive) {
+      const cycle = frameTime % 4;
+      if (cycle < 0.35) {
+        // Muzzle blast from port cannon (to the left)
+        const flashAlpha = 1 - cycle / 0.35;
+        ctx.fillStyle = `rgba(242, 165, 65, ${flashAlpha * 0.9})`;
+        ctx.beginPath();
+        ctx.arc(ix - 45, iy, 28 + Math.random() * 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(232, 223, 200, ${flashAlpha * 0.6})`;
+        ctx.beginPath();
+        ctx.arc(ix - 70, iy - 6, 22, 0, Math.PI * 2);
+        ctx.arc(ix - 55, iy + 8, 18, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Bosun Hari: largest silhouette, bald head, rope belt, anchor tattoo.
+   */
+  private drawHariNPC(hx: number, hy: number, _npc: NpcScheduleState): void {
+    const { ctx } = this;
+    ctx.save();
+
+    // Broad drop shadow
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(hx, hy + 18, 20, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Heavy boots
+    ctx.fillStyle = '#14100d';
+    ctx.fillRect(hx - 12, hy + 12, 8, 9);
+    ctx.fillRect(hx + 4, hy + 12, 8, 9);
+
+    // Massive broad chest & dark vest
+    ctx.fillStyle = '#261f18';
+    ctx.fillRect(hx - 16, hy - 16, 32, 28);
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.8;
+    ctx.strokeRect(hx - 16, hy - 16, 32, 28);
+
+    // Thick hemp rope belt with coil
+    ctx.fillStyle = '#9e8c6f';
+    ctx.fillRect(hx - 17, hy + 1, 34, 6);
+    ctx.beginPath();
+    ctx.arc(hx + 8, hy + 8, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Muscular bare arms
+    ctx.fillStyle = '#423326';
+    ctx.fillRect(hx - 20, hy - 12, 5, 18);
+    ctx.fillRect(hx + 15, hy - 12, 5, 18);
+
+    // Broad bald head
+    ctx.fillStyle = '#2e231a';
+    ctx.beginPath();
+    ctx.arc(hx, hy - 25, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // Anchor tattoo on neck
+    ctx.strokeStyle = '#122530';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(hx - 6, hy - 16);
+    ctx.lineTo(hx - 6, hy - 11);
+    ctx.arc(hx - 6, hy - 11, 3, 0, Math.PI);
+    ctx.stroke();
+
+    // Slow suspicious glint
+    ctx.fillStyle = PALETTE.Lantern;
+    ctx.fillRect(hx - 4, hy - 24, 2, 2);
+
+    ctx.restore();
+  }
+
+  /**
+   * Generic Mutineer Silhouette: hooded, slate grey, NO red sash (Prompt Issue 1).
+   */
+  private drawMutineerSilhouette(mx: number, my: number, _facing: string): void {
+    const { ctx } = this;
+    ctx.save();
+
+    // Shadow
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(mx, my + 18, 14, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Neutral dark grey tunic (NO red sash or bandana)
+    ctx.fillStyle = '#2d333b';
+    ctx.fillRect(mx - 11, my - 15, 22, 27);
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(mx - 11, my - 15, 22, 27);
+
+    // Weathered hooded cowl in neutral slate grey (#4a535e)
+    ctx.fillStyle = '#4a535e';
+    ctx.beginPath();
+    ctx.arc(mx, my - 22, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    // Hood capelet folds over shoulders
+    ctx.fillStyle = '#374151';
+    ctx.beginPath();
+    ctx.moveTo(mx - 13, my - 14);
+    ctx.lineTo(mx, my - 7);
+    ctx.lineTo(mx + 13, my - 14);
+    ctx.lineTo(mx + 11, my - 3);
+    ctx.lineTo(mx - 11, my - 3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Face cowl shadow
+    ctx.fillStyle = PALETTE.Tar;
+    ctx.beginPath();
+    ctx.arc(mx, my - 20, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Drawn steel cutlass
+    ctx.strokeStyle = '#9ca3af';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(mx + 8, my);
+    ctx.lineTo(mx + 16, my - 10);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  /**
+   * Gull Omen at 355: perched on main mast yardarm, looking down.
+   */
+  private drawGullOmen(gx: number, gy: number, frameTime: number): void {
+    const { ctx } = this;
+    ctx.save();
+
+    const flutter = Math.sin(frameTime * 12) * 1.5;
+
+    // Perched body (white/bone)
+    ctx.fillStyle = PALETTE.Bone;
+    ctx.beginPath();
+    ctx.ellipse(gx, gy, 8, 5, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Slate wings folded
+    ctx.fillStyle = PALETTE.Ash;
+    ctx.beginPath();
+    ctx.ellipse(gx - 3, gy - 2 + flutter * 0.3, 7, 3, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Head & yellow beak
+    ctx.fillStyle = PALETTE.Bone;
+    ctx.beginPath();
+    ctx.arc(gx + 6, gy - 4, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = PALETTE.Lantern;
+    ctx.beginPath();
+    ctx.moveTo(gx + 9, gy - 5);
+    ctx.lineTo(gx + 15, gy - 3);
+    ctx.lineTo(gx + 9, gy - 2);
+    ctx.fill();
+
+    // Small black eye
+    ctx.fillStyle = PALETTE.Tar;
+    ctx.fillRect(gx + 7, gy - 5, 1.5, 1.5);
+
+    ctx.restore();
+  }
+
+  /**
+   * Makara Leviathan Telegraph (470-479):
+   * Dark water shadow, bulging waves, and foaming spray on the port side.
+   */
+  private drawMakaraTelegraph(ctx: CanvasRenderingContext2D, frameTime: number): void {
+    ctx.save();
+
+    // 1. Massive dark shadow looming underwater along the port side (left 320px)
+    const pulse = 0.5 + 0.5 * Math.sin(frameTime * 3);
+    const shadowGrad = ctx.createRadialGradient(80, CONFIG.CANVAS_HEIGHT / 2, 20, 100, CONFIG.CANVAS_HEIGHT / 2, 340);
+    shadowGrad.addColorStop(0, `rgba(3, 8, 15, ${0.75 + pulse * 0.2})`);
+    shadowGrad.addColorStop(0.7, `rgba(7, 18, 28, ${0.5 + pulse * 0.15})`);
+    shadowGrad.addColorStop(1, 'rgba(11, 19, 32, 0)');
+
+    ctx.fillStyle = shadowGrad;
+    ctx.fillRect(0, 0, 360, CONFIG.CANVAS_HEIGHT);
+
+    // 2. Swelling bulging ocean wave arcs pushing against the port hull
+    ctx.strokeStyle = `rgba(180, 220, 235, ${0.45 + pulse * 0.25})`;
+    ctx.lineWidth = 3.5;
+    for (let w = 0; w < 7; w++) {
+      const wy = (w * 110 + frameTime * 40) % (CONFIG.CANVAS_HEIGHT + 100) - 50;
+      const waveSpread = Math.sin(frameTime * 4 + w) * 20;
+      ctx.beginPath();
+      ctx.ellipse(120 + waveSpread, wy, 80 + waveSpread, 32, 0.15, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 3. Erupting foaming sea spray
+    ctx.fillStyle = 'rgba(232, 240, 245, 0.45)';
+    for (let s = 0; s < 10; s++) {
+      const sprayX = 60 + s * 22 + Math.sin(frameTime * 6 + s) * 12;
+      const sprayY = 80 + s * 60 + Math.cos(frameTime * 5 + s) * 25;
+      const sprayRadius = 14 + Math.sin(frameTime * 8 + s) * 6;
+      ctx.beginPath();
+      ctx.arc(sprayX, sprayY, sprayRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Makara Leviathan Breach (480+):
+   * Rises over 3s filling the left third of the screen regardless of player position.
+   * Lunges at the port deck every 8 to 10 seconds.
+   * Features jaw, ribbed neck, glowing amber eye, and Tide Glow harpoon in throat.
+   */
+  private drawMakaraBreach(
+    ctx: CanvasRenderingContext2D,
+    frameTime: number,
+    shipTime: number
+  ): void {
+    const rise = Math.min(1.0, (shipTime - 480) / 3.0);
+    const breathe = Math.sin(frameTime * 1.8) * 6;
+    const pulse = 0.5 + 0.5 * Math.sin(frameTime * 4);
+
+    // Periodic lunge every 8 to 10 seconds (9s period)
+    const lungeCycle = (shipTime - 480) % 9.0;
+    let lungeX = 0;
+    let lungeY = 0;
+    if (lungeCycle >= 6.5 && lungeCycle <= 8.5) {
+      const progress = (lungeCycle - 6.5) / 2.0;
+      lungeX = Math.sin(progress * Math.PI) * 110;
+      lungeY = Math.sin(progress * Math.PI * 2) * 22;
+    }
+
+    // Screen-anchored filling about the left third of the screen (0 to ~400px)
+    const mx = 180 + lungeX;
+    const my = CONFIG.CANVAS_HEIGHT * 0.48 + (1.0 - rise) * 520 + lungeY + breathe;
+
+    ctx.save();
+
+    // 1. Violent ocean spray & foam swells around breach
+    ctx.fillStyle = 'rgba(232, 240, 245, 0.55)';
+    for (let i = 0; i < 9; i++) {
+      const foamX = mx - 90 + i * 36 + Math.sin(frameTime * 3 + i) * 10;
+      const foamY = my + 130 - Math.abs(i - 4) * 12 + Math.cos(frameTime * 2.5 + i) * 6;
+      ctx.beginPath();
+      ctx.arc(foamX, foamY, 26 + Math.sin(frameTime * 2 + i) * 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 2. Colossal Dark Slate Armored Serpentine Ribbed Neck & Body
+    ctx.fillStyle = '#081720';
+    ctx.beginPath();
+    ctx.moveTo(mx - 180, my + 300);
+    ctx.quadraticCurveTo(mx - 80, my - 90, mx + 75, my - 60);
+    ctx.quadraticCurveTo(mx + 110, my + 30, mx + 50, my + 95);
+    ctx.quadraticCurveTo(mx - 15, my + 200, mx - 120, my + 300);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#050c12';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Armored dorsal scutes / ribbed neck spines
+    ctx.fillStyle = '#163542';
+    ctx.strokeStyle = '#07090f';
+    ctx.lineWidth = 2.5;
+    for (let s = 0; s < 7; s++) {
+      const spX = mx - 110 + s * 28;
+      const spY = my - 50 + s * 22;
+      ctx.beginPath();
+      ctx.moveTo(spX, spY);
+      ctx.lineTo(spX - 18, spY - 35);
+      ctx.lineTo(spX + 14, spY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // 3. Colossal Armored Lower and Upper Jaw
+    ctx.fillStyle = '#0b1d28';
+    ctx.beginPath();
+    ctx.moveTo(mx + 60, my - 60);
+    ctx.lineTo(mx + 155, my - 25);
+    ctx.lineTo(mx + 90, my + 15);
+    ctx.lineTo(mx + 160, my + 55);
+    ctx.lineTo(mx + 45, my + 70);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 4. Curved Ivory Leviathan Fangs (Bone)
+    ctx.fillStyle = PALETTE.Bone;
+    for (let f = 0; f < 5; f++) {
+      const fangUpperX = mx + 60 + f * 18;
+      const fangUpperY = my - 45 + f * 6;
+      ctx.beginPath();
+      ctx.moveTo(fangUpperX, fangUpperY);
+      ctx.lineTo(fangUpperX + 8, fangUpperY + 24);
+      ctx.lineTo(fangUpperX + 16, fangUpperY);
+      ctx.closePath();
+      ctx.fill();
+
+      const fangLowerX = mx + 55 + f * 18;
+      const fangLowerY = my + 45 - f * 4;
+      ctx.beginPath();
+      ctx.moveTo(fangLowerX, fangLowerY);
+      ctx.lineTo(fangLowerX + 7, fangLowerY - 22);
+      ctx.lineTo(fangLowerX + 15, fangLowerY);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 5. Glowing Amber Leviathan Eye with vertical slit pupil
+    const eyeX = mx + 45;
+    const eyeY = my - 25;
+
+    ctx.fillStyle = '#f2a541'; // Amber
+    ctx.beginPath();
+    ctx.ellipse(eyeX, eyeY, 15, 20, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PALETTE.Tar;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Slit pupil
+    ctx.fillStyle = PALETTE.Tar;
+    ctx.beginPath();
+    ctx.ellipse(eyeX, eyeY, 4, 18, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 6. Pulsing Tide Glow Harpoon Point embedded in throat (#5fd3c4)
+    const harpX = mx + 25;
+    const harpY = my + 65;
+
+    // Glowing radiating aura
+    ctx.fillStyle = `rgba(95, 211, 196, ${0.45 + pulse * 0.45})`;
+    ctx.beginPath();
+    ctx.arc(harpX, harpY, 34 + pulse * 14, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Heavy iron harpoon shaft
+    ctx.strokeStyle = '#2b3e45';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(harpX + 40, harpY - 30);
+    ctx.lineTo(harpX - 8, harpY + 16);
+    ctx.stroke();
+
+    // Barbed Tide Glow harpoon tip
+    ctx.fillStyle = PALETTE.TideGlow;
+    ctx.beginPath();
+    ctx.moveTo(harpX - 10, harpY + 18);
+    ctx.lineTo(harpX - 26, harpY + 5);
+    ctx.lineTo(harpX - 8, harpY - 8);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  /**
+   * Floating Event BARK speech bubble above NPC head (2.5s duration, within 8 tiles).
+   */
+  private drawNpcBark(nx: number, ny: number, text: string): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.font = 'bold 13px monospace';
+    const textWidth = ctx.measureText(text).width;
+    const boxW = textWidth + 24;
+    const boxH = 26;
+    const boxX = nx - boxW / 2;
+    const boxY = ny - 68;
+
+    // Speech bubble background
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.95)';
+    ctx.fillRect(boxX, boxY, boxW, boxH);
+
+    // Border in Lantern gold
+    ctx.strokeStyle = PALETTE.Lantern;
+    ctx.lineWidth = 1.8;
+    ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+    // Small downward pointer triangle
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.95)';
+    ctx.beginPath();
+    ctx.moveTo(nx - 6, boxY + boxH);
+    ctx.lineTo(nx, boxY + boxH + 6);
+    ctx.lineTo(nx + 6, boxY + boxH);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = PALETTE.Lantern;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(nx - 6, boxY + boxH);
+    ctx.lineTo(nx, boxY + boxH + 6);
+    ctx.lineTo(nx + 6, boxY + boxH);
+    ctx.stroke();
+
+    // Text in Bone
+    ctx.fillStyle = PALETTE.Bone;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, nx, boxY + boxH / 2);
+
+    ctx.restore();
+  }
+
+  /**
+   * Floating NPC Name Badge Pill (Rendered when player is within 2.5 tiles).
+   */
+  private drawNpcNamePill(nx: number, ny: number, name: string, role: string): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 12px monospace';
+
+    const label = `${name} (${role})`;
+    const textWidth = ctx.measureText(label).width;
+    const pillW = textWidth + 16;
+    const pillH = 18;
+    const pillX = nx - pillW / 2;
+    const pillY = ny - 45;
+
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.88)';
+    ctx.fillRect(pillX, pillY, pillW, pillH);
+
+    ctx.strokeStyle = PALETTE.Lantern;
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(pillX, pillY, pillW, pillH);
+
+    ctx.fillStyle = PALETTE.Bone;
+    ctx.fillText(label, nx, pillY + pillH / 2);
 
     ctx.restore();
   }

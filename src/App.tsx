@@ -7,11 +7,15 @@ import { DeathToast } from './ui/DeathToast';
 import { DebugPanel } from './ui/DebugPanel';
 import { DialogueBox } from './ui/DialogueBox';
 import { Hud } from './ui/Hud';
+import { IntroCutscene } from './ui/IntroCutscene';
 import { Journal } from './ui/Journal';
+import { TitleScreen } from './ui/TitleScreen';
+import { useUIStore } from './store/uiStore';
 
 export const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<GameEngine | null>(null);
+  const gameScreen = useUIStore((s) => s.gameScreen);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -116,6 +120,12 @@ export const App: React.FC = () => {
 
         {/* Death Toast Overlay */}
         <DeathToast onRespawn={handleRespawn} />
+
+        {/* Title Screen Overlay */}
+        {gameScreen === 'title' && <TitleScreen />}
+
+        {/* Text-only Opening Cutscene Overlay */}
+        {gameScreen === 'intro' && <IntroCutscene />}
 
         {/* Dev Debug Panel - Only present during development, stripped in itch.io production build */}
         {import.meta.env.DEV && (

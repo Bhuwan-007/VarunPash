@@ -61,3 +61,160 @@ export function playKnowledgeBell(): void {
     console.debug('Audio chime skipped:', err);
   }
 }
+
+/**
+ * Synthesizes three seagulls crying in sequence for the Gull Omen at 355s (FEEL.md §6).
+ */
+export function playGullCry(): void {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const cryTimes = [0, 0.75, 1.5];
+
+    cryTimes.forEach((delay) => {
+      const startTime = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      // Gull call: upward inflection followed by harsh drop
+      osc.frequency.setValueAtTime(1400, startTime);
+      osc.frequency.linearRampToValueAtTime(2450, startTime + 0.12);
+      osc.frequency.exponentialRampToValueAtTime(1600, startTime + 0.38);
+
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.linearRampToValueAtTime(0.18, startTime + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.42);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + 0.45);
+    });
+  } catch (err) {
+    console.debug('Gull audio skipped:', err);
+  }
+}
+
+/**
+ * Synthesizes a deep sub-surface leviathan rumble for the Makara breach at 480s.
+ */
+export function playMakaraRumble(): void {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(55, now);
+    osc.frequency.exponentialRampToValueAtTime(32, now + 3.0);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(120, now);
+    filter.frequency.exponentialRampToValueAtTime(60, now + 3.0);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.35, now + 0.5);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.2);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 3.3);
+  } catch (err) {
+    console.debug('Makara audio skipped:', err);
+  }
+}
+
+/**
+ * Synthesizes a flintlock pistol shot through slatted wood when Nakhuda shoots intruders.
+ */
+export function playGunshot(): void {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+
+    // 1. Noise blast
+    const bufferSize = ctx.sampleRate * 0.4;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 850;
+
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.5, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(ctx.destination);
+
+    // 2. Low thump
+    const osc = ctx.createOscillator();
+    const thumpGain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(120, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.25);
+
+    thumpGain.gain.setValueAtTime(0.4, now);
+    thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+    osc.connect(thumpGain);
+    thumpGain.connect(ctx.destination);
+
+    noise.start(now);
+    osc.start(now);
+    noise.stop(now + 0.4);
+    osc.stop(now + 0.3);
+  } catch (err) {
+    console.debug('Gunshot audio skipped:', err);
+  }
+}
+
+/**
+ * Synthesizes a sharp steel knife strike when Kedar attacks.
+ */
+export function playKnifeStab(): void {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(1100, now);
+    osc.frequency.exponentialRampToValueAtTime(320, now + 0.18);
+
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.25);
+  } catch (err) {
+    console.debug('Knife audio skipped:', err);
+  }
+}
+

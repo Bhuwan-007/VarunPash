@@ -48,3 +48,27 @@ export function addKnowledge(flag: string): boolean {
 
   return true;
 }
+
+/**
+ * Dedicated function to add journal notes without needing a knowledge flag (Prompt Issue 4).
+ * Used by dialogue lines, clue discoveries, and NPC interactions.
+ */
+export function addDirectJournalEntry(entry: {
+  id: string;
+  tab: 'Clues' | 'Tide Table' | 'People' | 'Codes';
+  text: string;
+  title?: string;
+  npcId?: string;
+}): boolean {
+  const memoryStore = useMemoryStore.getState();
+  const added = memoryStore.addJournalEntry(entry);
+  if (added) {
+    const loopStore = useLoopStore.getState();
+    loopStore.markLearned(entry.text);
+    useUIStore.getState().triggerJournalPulse();
+    playKnowledgeBell();
+    return true;
+  }
+  return false;
+}
+

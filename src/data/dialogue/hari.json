@@ -1,2 +1,70 @@
-{}
-
+{
+  "npc": "hari",
+  "name": "Bosun Hari",
+  "title": "Bosun",
+  "lines": [
+    {
+      "id": "hari_calm",
+      "text": "Keep clear of the falls. Lifeboats don't launch for empty pockets.",
+      "when": {
+        "timeMin": 0,
+        "timeMax": 300
+      },
+      "priority": 10,
+      "journalNote": "Bosun Hari guards the starboard davits like a warden. Thick rope and knotted muscle."
+    },
+    {
+      "id": "hari_pre_mutiny",
+      "text": "The barometer's in the basement. Something ugly is coming up through the floorboards.",
+      "when": {
+        "timeMin": 300,
+        "timeMax": 359
+      },
+      "priority": 20,
+      "journalNote": "Hari senses the impending mutiny. He checks his cleaver and tightens the lifeboat winch."
+    },
+    {
+      "id": "hari_mutiny",
+      "text": "Kedar runs the deck now. I don't care whose head is on the sovereign, so long as it weighs true.",
+      "when": {
+        "timeMin": 360,
+        "timeMax": 479
+      },
+      "priority": 30,
+      "journalNote": "Hari switched allegiance to Kedar without blinking. Coin is his only creed."
+    },
+    {
+      "id": "hari_makara",
+      "text": "The cutter's our only chance! The winch is locked—you hold the release plate, I'll grease the gears!",
+      "when": {
+        "timeMin": 480,
+        "timeMax": 600
+      },
+      "priority": 45,
+      "journalNote": "Hari panics as the ship shudders. He yells that the winch plate will drop the lifeboat."
+    },
+    {
+      "id": "hari_bribe_price",
+      "text": "One gold coin from the captain's stash. Bring me that, and this cutter drops into the swell with you in it.",
+      "when": {
+        "minLoop": 2,
+        "timeMin": 0,
+        "timeMax": 359
+      },
+      "priority": 25,
+      "journalNote": "Hari named his price: one gold coin from the captain's chest to launch the escape cutter."
+    },
+    {
+      "id": "hari_locket_hint",
+      "text": "Saw something shining near the capstan. Silver locket. Left it alone. Dead men's trinkets bring bad water.",
+      "when": {
+        "flags": ["K_BHIMA_GOSSIP"],
+        "timeMin": 0,
+        "timeMax": 359
+      },
+      "priority": 22,
+      "grants": ["CLUE_LOCKET"],
+      "journalNote": "Hari saw a silver locket dropped near the capstan. Refused to touch it for fear of ill luck."
+    }
+  ]
+}

@@ -53,8 +53,31 @@ export function checkAABBCollision(map: GameMap, box: BoundingBox): boolean {
   return false;
 }
 
+export interface DynamicObstacle {
+  x: number;
+  y: number;
+  radius: number;
+}
+
+export function checkObstacleCollision(
+  px: number,
+  py: number,
+  obstacles: DynamicObstacle[] = [],
+  playerRadius: number = 0.2
+): boolean {
+  for (const obs of obstacles) {
+    const minDist = obs.radius + playerRadius;
+    const dx = px - obs.x;
+    const dy = py - obs.y;
+    if (dx * dx + dy * dy < minDist * minDist) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
- * Resolves movement with separate X and Y axis AABB collisions to allow smooth sliding along walls.
+ * Resolves movement with separate X and Y axis AABB collisions to allow smooth sliding along walls and NPCs.
  * Includes corner assistance nudge to prevent getting caught on doorframes and staircase edges.
  * Returns the resolved position { x, y }.
  */
@@ -65,7 +88,8 @@ export function resolveMovement(
   deltaX: number,
   deltaY: number,
   halfWidth: number = 0.18,
-  halfHeight: number = 0.14
+  halfHeight: number = 0.14,
+  obstacles: DynamicObstacle[] = []
 ): { x: number; y: number } {
   let newX = currentX;
   let newY = currentY;
@@ -82,7 +106,7 @@ export function resolveMovement(
       maxY: currentY + halfHeight - skinInset,
     };
 
-    if (!checkAABBCollision(map, boxX)) {
+    if (!checkAABBCollision(map, boxX) && !checkObstacleCollision(testX, currentY, obstacles, halfWidth)) {
       newX = testX;
     }
   }
@@ -97,7 +121,7 @@ export function resolveMovement(
       maxY: testY + halfHeight,
     };
 
-    if (!checkAABBCollision(map, boxY)) {
+    if (!checkAABBCollision(map, boxY) && !checkObstacleCollision(newX, testY, obstacles, halfHeight)) {
       newY = testY;
     }
   }
@@ -117,9 +141,9 @@ export function resolveMovement(
       minY: currentY + nudge - halfHeight + skinInset,
       maxY: currentY + nudge + halfHeight - skinInset,
     };
-    if (!checkAABBCollision(map, boxUp)) {
+    if (!checkAABBCollision(map, boxUp) && !checkObstacleCollision(currentX + deltaX, currentY - nudge * 0.7, obstacles, halfWidth)) {
       newY = currentY - nudge * 0.7;
-    } else if (!checkAABBCollision(map, boxDown)) {
+    } else if (!checkAABBCollision(map, boxDown) && !checkObstacleCollision(currentX + deltaX, currentY + nudge * 0.7, obstacles, halfWidth)) {
       newY = currentY + nudge * 0.7;
     }
   } else if (deltaY !== 0 && deltaX === 0 && newY === currentY) {
@@ -136,9 +160,9 @@ export function resolveMovement(
       minY: currentY + deltaY - halfHeight,
       maxY: currentY + deltaY + halfHeight,
     };
-    if (!checkAABBCollision(map, boxLeft)) {
+    if (!checkAABBCollision(map, boxLeft) && !checkObstacleCollision(currentX - nudge * 0.7, currentY + deltaY, obstacles, halfHeight)) {
       newX = currentX - nudge * 0.7;
-    } else if (!checkAABBCollision(map, boxRight)) {
+    } else if (!checkAABBCollision(map, boxRight) && !checkObstacleCollision(currentX + nudge * 0.7, currentY + deltaY, obstacles, halfHeight)) {
       newX = currentX + nudge * 0.7;
     }
   }
@@ -147,14 +171,15 @@ export function resolveMovement(
 }
 
 /**
- * Checks if a position { x, y } is fully walkable for the player's bounding box.
+ * Checks if a position { x, y } is fully walkable for the player's bounding box and dynamic obstacles.
  */
 export function isPositionWalkable(
   map: GameMap,
   x: number,
   y: number,
   halfWidth: number = 0.18,
-  halfHeight: number = 0.14
+  halfHeight: number = 0.14,
+  obstacles: DynamicObstacle[] = []
 ): boolean {
   if (x < 0 || x >= map.width || y < 0 || y >= map.height) {
     return false;
@@ -165,13 +190,13 @@ export function isPositionWalkable(
     minY: y - halfHeight,
     maxY: y + halfHeight,
   };
-  return !checkAABBCollision(map, box);
+  return !checkAABBCollision(map, box) && !checkObstacleCollision(x, y, obstacles, halfWidth);
 }
 
 /**
  * Finds the nearest walkable position to (targetX, targetY).
  * Performs a radial search around (targetX, targetY) up to maxRadius tiles.
- * The player must NEVER be placed inside a solid tile.
+ * The player must NEVER be placed inside a solid tile or inside a dynamic obstacle.
  */
 export function findNearestWalkableTile(
   map: GameMap,
@@ -179,9 +204,10 @@ export function findNearestWalkableTile(
   targetY: number,
   halfWidth: number = 0.18,
   halfHeight: number = 0.14,
-  maxRadius: number = 5
+  maxRadius: number = 5,
+  obstacles: DynamicObstacle[] = []
 ): { x: number; y: number } {
-  if (isPositionWalkable(map, targetX, targetY, halfWidth, halfHeight)) {
+  if (isPositionWalkable(map, targetX, targetY, halfWidth, halfHeight, obstacles)) {
     return { x: targetX, y: targetY };
   }
 
@@ -194,7 +220,7 @@ export function findNearestWalkableTile(
       const testX = Math.round((targetX + Math.cos(angle) * r) * 100) / 100;
       const testY = Math.round((targetY + Math.sin(angle) * r) * 100) / 100;
 
-      if (isPositionWalkable(map, testX, testY, halfWidth, halfHeight)) {
+      if (isPositionWalkable(map, testX, testY, halfWidth, halfHeight, obstacles)) {
         return { x: testX, y: testY };
       }
     }

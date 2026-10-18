@@ -1,5 +1,5 @@
 import { CONFIG } from '../../config';
-import { resolveMovement } from '../collision';
+import { DynamicObstacle, resolveMovement } from '../collision';
 import { GameMap } from '../world/deckMap';
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -33,7 +33,8 @@ export class Player {
   public update(
     moveDir: { dx: number; dy: number },
     dt: number,
-    map: GameMap
+    map: GameMap,
+    obstacles: DynamicObstacle[] = []
   ): void {
     const { dx, dy } = moveDir;
 
@@ -53,8 +54,8 @@ export class Player {
       const deltaX = dx * moveDistance;
       const deltaY = dy * moveDistance;
 
-      // Resolve collision against solid tiles (0.18 half-width allows fitting smoothly through doors and stairs)
-      const resolved = resolveMovement(map, this.x, this.y, deltaX, deltaY, 0.18, 0.14);
+      // Resolve collision against solid tiles and visible NPCs (dynamic obstacles)
+      const resolved = resolveMovement(map, this.x, this.y, deltaX, deltaY, 0.18, 0.14, obstacles);
       this.x = resolved.x;
       this.y = resolved.y;
     } else {

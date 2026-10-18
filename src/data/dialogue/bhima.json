@@ -4,44 +4,76 @@
   "title": "Ship's Cook",
   "lines": [
     {
-      "id": "bhima_quartermaster",
-      "text": "A coin for a word, sir. Everyone has a price on this ship.",
-      "requires": [],
-      "role": "quartermaster",
-      "minLoop": 0,
-      "grants": [],
-      "priority": 40,
-      "once": false
-    },
-    {
-      "id": "bhima_loop2",
-      "text": "Back again? You look like you've seen the bottom of the pot.",
-      "requires": [],
-      "role": null,
-      "minLoop": 2,
-      "grants": [],
-      "priority": 30,
-      "once": false
-    },
-    {
-      "id": "bhima_gossip",
-      "text": "Kedar's got a sweet tooth for gold. Hari's got a sweet tooth for coin. Me? I like quiet.",
-      "requires": ["K_BHIMA_GOSSIP"],
-      "role": null,
-      "minLoop": 0,
-      "grants": [],
-      "priority": 20,
-      "once": false
-    },
-    {
-      "id": "bhima_default",
-      "text": "Everything on this ship gets cooked in the end. Hungry?",
-      "requires": [],
-      "role": null,
-      "minLoop": 0,
-      "grants": ["K_BHIMA_GOSSIP"],
+      "id": "bhima_calm",
+      "text": "Everything on this ship gets cooked in the end. Salt pork today, brine tomorrow.",
+      "when": {
+        "timeMin": 0,
+        "timeMax": 300
+      },
       "priority": 10,
-      "once": true
+      "grants": ["K_BHIMA_GOSSIP"],
+      "journalNote": "Bhima stirs his pots and speaks of the crew like cuts of meat. He knows everyone's appetite."
+    },
+    {
+      "id": "bhima_pre_mutiny",
+      "text": "The First Mate slipped below to the hold. Didn't carry flour, neither. There's cold steel in the air.",
+      "when": {
+        "timeMin": 300,
+        "timeMax": 359
+      },
+      "priority": 20,
+      "journalNote": "Bhima watched Kedar slip down the cargo hatch. Whispers of a gathering among the crates."
+    },
+    {
+      "id": "bhima_mutiny",
+      "text": "Hear that shot? That was the Nakhuda's pistol. Kedar's taking the ship, and he won't be sharing the broth.",
+      "when": {
+        "timeMin": 360,
+        "timeMax": 479
+      },
+      "priority": 30,
+      "journalNote": "The captain is dead by Kedar's hand. Bhima is hunkered down, waiting out the butchery."
+    },
+    {
+      "id": "bhima_makara",
+      "text": "The sea's got teeth! That's the Makara rising—wood won't hold it, prayers won't feed it!",
+      "when": {
+        "timeMin": 480,
+        "timeMax": 600
+      },
+      "priority": 40,
+      "journalNote": "The Leviathan has breached the port rail. Bhima screams that the ocean has come to swallow us whole."
+    },
+    {
+      "id": "bhima_gull_hint",
+      "text": "Look to the spar. When the white gull cries thrice, blood follows water. Never fails.",
+      "when": {
+        "timeMin": 300,
+        "timeMax": 360,
+        "flags": ["K_BHIMA_GOSSIP"]
+      },
+      "priority": 35,
+      "grants": ["CLUE_GULL_CRIES"],
+      "journalNote": "Bhima warned me of the gull's three cries. An ancient omen before every slaughter."
+    },
+    {
+      "id": "bhima_hari_bribe",
+      "text": "Hari's watching the lifeboats. Give that dog a silver sovereign and he'll look at the clouds while you lower the davits.",
+      "when": {
+        "flags": ["K_BHIMA_GOSSIP"],
+        "minLoop": 2
+      },
+      "priority": 25,
+      "journalNote": "Hari guards the starboard cutter, but his loyalty has a price: one gold coin to look away."
+    },
+    {
+      "id": "bhima_quartermaster_safe",
+      "text": "The Nakhuda keeps his private locker sealed with three numbers. Kept muttering them over his tea.",
+      "when": {
+        "role": "quartermaster"
+      },
+      "priority": 45,
+      "journalNote": "Bhima overheard Thorne muttering the safe's combination in his cabin."
     }
   ]
 }

@@ -1,2 +1,40 @@
-{}
-
+{
+  "npc": "nakhuda",
+  "name": "Nakhuda Thorne",
+  "title": "Captain of the Jal-Doot",
+  "lines": [
+    {
+      "id": "nakhuda_examine_body",
+      "text": "Thorne lies sprawled in his own blood outside the cabin. A pistol ball took him in the breast. In his dying breath he scratched '7-3-1' into the deck planks.",
+      "when": {
+        "timeMin": 360,
+        "timeMax": 600,
+        "activity": "dead"
+      },
+      "priority": 100,
+      "grants": ["K_SAFE_CODE", "CLUE_DEATH_SHOT"],
+      "journalNote": "Examined Nakhuda Thorne's body. Shot down by Kedar. Before dying, he scratched the code '7-3-1' into the wood."
+    },
+    {
+      "id": "nakhuda_at_helm",
+      "text": "Count the stars. Count the knives. The knives are winning. Keep off my quarterdeck!",
+      "when": {
+        "timeMin": 240,
+        "timeMax": 260,
+        "activity": "at_helm"
+      },
+      "priority": 50,
+      "journalNote": "Captain Thorne stood shivering at the ship's wheel, peering into the dark water with wild eyes."
+    },
+    {
+      "id": "nakhuda_deck_compass",
+      "text": "The compass is spinning backwards! The stone in the hold has turned the world inside out!",
+      "when": {
+        "timeMin": 240,
+        "timeMax": 300
+      },
+      "priority": 40,
+      "journalNote": "Thorne screamed that the lodestone is dead and the Kaal Mani in the bilge is pulling us into the maw."
+    }
+  ]
+}

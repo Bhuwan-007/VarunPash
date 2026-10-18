@@ -238,6 +238,46 @@ export const Hud: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* One-time controls hint in loop 1 (Prompt Issue 6) */}
+      {deathCount === 0 && !useUIStore.getState().hasDismissedControlsHint && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(7, 9, 15, 0.92)',
+            border: `1.5px solid ${PALETTE.Lantern}`,
+            borderRadius: '6px',
+            padding: '8px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            color: PALETTE.Bone,
+            fontSize: '14px',
+            letterSpacing: '1px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.8)',
+            pointerEvents: 'auto',
+            animation: 'fadeIn 0.3s ease',
+          }}
+        >
+          <span>WASD move, E interact, J journal</span>
+          <button
+            onClick={() => useUIStore.getState().dismissControlsHint()}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: PALETTE.Lantern,
+              cursor: 'pointer',
+              fontSize: '14px',
+              padding: '0 4px',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 };

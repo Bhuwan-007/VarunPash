@@ -1,2 +1,78 @@
-{}
-
+{
+  "npc": "kedar",
+  "name": "First Mate Kedar Voss",
+  "title": "First Mate",
+  "lines": [
+    {
+      "id": "kedar_loop_aware",
+      "text": "You again. You die at the rail, you die in the hold, yet here you stand. What devil walks in your boots?",
+      "when": {
+        "minLoop": 4,
+        "flags": ["K_MUTINEER"]
+      },
+      "priority": 60,
+      "journalNote": "Kedar recognizes me across the loops. His smirk broke into cold, creeping dread."
+    },
+    {
+      "id": "kedar_calm",
+      "text": "You look tired. Sleep. It's cheap, I hear.",
+      "when": {
+        "timeMin": 0,
+        "timeMax": 300
+      },
+      "priority": 10,
+      "journalNote": "First Mate Kedar Voss watches the deck with cold, idle amusement. His hand rests on his dirk."
+    },
+    {
+      "id": "kedar_pre_mutiny",
+      "text": "Mind your business at the hatch. Some cargo is strictly between me and my men.",
+      "when": {
+        "timeMin": 300,
+        "timeMax": 359
+      },
+      "priority": 20,
+      "journalNote": "Kedar warned me away from the hold. He is rallying men among the brine barrels."
+    },
+    {
+      "id": "kedar_mutiny",
+      "text": "Thorne had his turn at the wheel. The Jal-Doot answers to me now. Stay out of my path.",
+      "when": {
+        "timeMin": 360,
+        "timeMax": 479
+      },
+      "priority": 30,
+      "grants": ["K_MUTINEER"],
+      "journalNote": "Kedar holds the bloody helm. He took the ship and took Thorne's chest keys."
+    },
+    {
+      "id": "kedar_makara",
+      "text": "Damn the beast! It followed the crystal's hum! Isha, blow that devil back into the trough!",
+      "when": {
+        "timeMin": 480,
+        "timeMax": 600
+      },
+      "priority": 40,
+      "journalNote": "Kedar curses the sea beast. He knows the humming stone in the hold drew the Makara to us."
+    },
+    {
+      "id": "kedar_gold_bribe",
+      "text": "A wise man doesn't drown for another man's ledger. Gold buys more loyalty than any commission.",
+      "when": {
+        "minLoop": 2,
+        "timeMin": 0,
+        "timeMax": 359
+      },
+      "priority": 25,
+      "journalNote": "Kedar cares only for the hold's locked gold. A purse might stay his blade."
+    },
+    {
+      "id": "kedar_navigator_hint",
+      "text": "Navigator, check the stars. The charts ended yesterday. We are sailing off the rim.",
+      "when": {
+        "role": "navigator"
+      },
+      "priority": 35,
+      "journalNote": "Kedar warned the Navigator that our course abandoned all known charts."
+    }
+  ]
+}
