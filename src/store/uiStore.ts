@@ -16,6 +16,11 @@ export interface ActiveDialogueSession {
   line: DialogueLine;
 }
 
+export interface ActiveCutsceneSession {
+  id: string;
+  onComplete?: () => void;
+}
+
 export interface UIState {
   gameScreen: 'title' | 'intro' | 'game';
   deathToast: DeathToastData | null;
@@ -23,6 +28,7 @@ export interface UIState {
   journalOpen: boolean;
   journalPulse: boolean;
   activeCutsceneId: string | null;
+  activeCutscene: ActiveCutsceneSession | null;
   activeDialogue: ActiveDialogueSession | null;
   interactionIgnoreTimer: number;
   hasDismissedControlsHint: boolean;
@@ -39,6 +45,8 @@ export interface UIState {
   toggleJournal: () => void;
   triggerJournalPulse: () => void;
   setActiveCutsceneId: (id: string | null) => void;
+  playCutscene: (id: string, onComplete?: () => void) => void;
+  closeCutscene: () => void;
   startDialogue: (npcId: string) => boolean;
   closeDialogue: () => void;
   setInteractionIgnoreTimer: (duration: number) => void;
@@ -58,6 +66,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   journalOpen: false,
   journalPulse: false,
   activeCutsceneId: null,
+  activeCutscene: null,
   activeDialogue: null,
   interactionIgnoreTimer: 0,
   hasDismissedControlsHint: false,
@@ -66,6 +75,27 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   setGameScreen: (screen) => set({ gameScreen: screen }),
   dismissControlsHint: () => set({ hasDismissedControlsHint: true }),
+  playCutscene: (id: string, onComplete?: () => void) => {
+    useLoopStore.getState().setPaused(true);
+    set({
+      activeCutscene: { id, onComplete },
+      activeCutsceneId: id,
+    });
+  },
+  closeCutscene: () => {
+    const session = get().activeCutscene;
+    set({
+      activeCutscene: null,
+      activeCutsceneId: null,
+      interactionIgnoreTimer: 0.3,
+    });
+    if (session?.onComplete) {
+      session.onComplete();
+    }
+    if (!get().journalOpen && !get().activeDialogue && !get().roleCardOpen && !get().strongboxKeypadOpen) {
+      useLoopStore.getState().setPaused(false);
+    }
+  },
   openRoleCard: () => {
     useLoopStore.getState().setPaused(true);
     set({ roleCardOpen: true });
@@ -178,3 +208,11 @@ export const useUIStore = create<UIState>((set, get) => ({
     set({ interactionIgnoreTimer: duration });
   },
 }));
+
+export const playCutscene = (id: string, onComplete?: () => void) => {
+  useUIStore.getState().playCutscene(id, onComplete);
+};
+
+if (typeof window !== 'undefined') {
+  (window as unknown as { playCutscene: typeof playCutscene }).playCutscene = playCutscene;
+}

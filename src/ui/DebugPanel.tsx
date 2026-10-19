@@ -454,6 +454,85 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
             </div>
           </div>
 
+          {/* P7 Ending & Winch Shortcuts */}
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '11px', color: PALETTE.Ash, marginBottom: '6px' }}>P7 HERO'S SACRIFICE SHORTCUTS:</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+              <button
+                id="btn-dev-give-chant"
+                onClick={() => {
+                  addKnowledge('K_CHANT');
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: PALETTE.Deepwater,
+                  color: PALETTE.Lantern,
+                  border: `1px solid ${PALETTE.Lantern}`,
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                Give K_CHANT
+              </button>
+              <button
+                id="btn-dev-launch-boats"
+                onClick={() => {
+                  useLoopStore.getState().launchLifeboats();
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: PALETTE.Deepwater,
+                  color: PALETTE.TideGlow,
+                  border: `1px solid ${PALETTE.TideGlow}`,
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                Launch boats
+              </button>
+              <button
+                id="btn-dev-jump-560"
+                onClick={() => {
+                  setShipTime(560);
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: PALETTE.Deepwater,
+                  color: PALETTE.Bone,
+                  border: '1px solid #1a4253',
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                Jump 560
+              </button>
+              <button
+                id="btn-dev-trigger-ending"
+                onClick={() => {
+                  useMemoryStore.getState().recordEnding('hero');
+                  useUIStore.getState().playCutscene('ending_hero', () => {
+                    useUIStore.getState().setGameScreen('title');
+                  });
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: 'rgba(242, 165, 65, 0.2)',
+                  color: PALETTE.Lantern,
+                  border: `1px solid ${PALETTE.Lantern}`,
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+              >
+                Trigger ending_hero
+              </button>
+            </div>
+          </div>
+
           {/* Loop & Game Reset Controls (BUG 2) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <button

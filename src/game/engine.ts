@@ -11,6 +11,7 @@ import { InputManager } from './input';
 import { EventScheduler, EventStatus } from './systems/eventScheduler';
 import { addKnowledge } from './systems/knowledge';
 import { LoopManager } from './systems/loopManager';
+import { triggerMoment } from './systems/moments';
 import { MutineerSilhouette, NpcScheduler, NpcScheduleState } from './systems/npcScheduler';
 import { createDeckMap, GameMap } from './world/deckMap';
 import { createHoldMap } from './world/holdMap';
@@ -50,6 +51,9 @@ export interface ReadonlyGameState {
   readonly dangerHoldProgress: number;
   readonly dangerTargetId: string | null;
   readonly hasPickedDeckLocket: boolean;
+  readonly winchHoldProgress: number;
+  readonly chantHoldProgress: number;
+  readonly lifeboatsLaunched: boolean;
 }
 
 export class GameEngine {
@@ -76,6 +80,8 @@ export class GameEngine {
   private eavesdropHoldTimer: number = 0;
   private dangerHoldTimer: number = 0;
   private dangerTargetId: string | null = null;
+  private winchHoldTimer: number = 0;
+  private chantHoldTimer: number = 0;
   private navigatorKnockIndex: number = 0;
 
   private activeBarks: ActiveBark[] = [];
@@ -131,6 +137,8 @@ export class GameEngine {
         this.previousShipTime = useLoopStore.getState().shipTime;
         this.dangerHoldTimer = 0;
         this.dangerTargetId = null;
+        this.winchHoldTimer = 0;
+        this.chantHoldTimer = 0;
         this.eventScheduler.reset();
 
         this.camera.update(
@@ -215,7 +223,12 @@ export class GameEngine {
     // 3. Event Scheduler update (gull cries, makara rumble, sinking death)
     this.eventScheduler.update(shipTime, this.previousShipTime, {
       onShake: (intensity, duration) => this.screenShake.trigger(intensity, duration),
-      onDeath: (cause) => this.loopManager.handleDeath(cause),
+      onDeath: (cause) => {
+        if (cause.includes('drown')) {
+          triggerMoment('drowned');
+        }
+        this.loopManager.handleDeath(cause);
+      },
     });
     this.previousShipTime = shipTime;
 
@@ -223,6 +236,14 @@ export class GameEngine {
     if (this.loopManager.isDeathInProgress()) {
       this.input.endFrame();
       return;
+    }
+
+    // Moment hooks for mutiny start at 360 and makara breach at 480 while alive
+    if (shipTime >= 360) {
+      triggerMoment('stabbing');
+    }
+    if (shipTime >= 480) {
+      triggerMoment('makara');
     }
 
     // 3b. Makara telegraph low rumble & screen tremor (470 - 479)
@@ -265,9 +286,16 @@ export class GameEngine {
     }
 
     // 5. Dynamic NPC Obstacles (solid for the player, pure function of shipTime)
-    const currentNpcs = NpcScheduler.getAllNpcStates(shipTime);
+    const currentNpcs = this.getEvacuatingNpcStates(shipTime);
+    const lifeboatsLaunched = useLoopStore.getState().lifeboatsLaunched;
+    const evacuatingIds = ['bhima', 'isha', 'hari', 'nakhuda'];
+
     const dynamicObstacles: DynamicObstacle[] = [];
     for (const npc of currentNpcs) {
+      // Evacuating NPCs running to lifeboats must not collide or push the player
+      if (evacuatingIds.includes(npc.id) && (this.winchHoldTimer > 0 || lifeboatsLaunched)) {
+        continue;
+      }
       // NPCs in cabin or on another scene are not obstacles on this scene
       if (npc.scene === this.scene && npc.activity !== 'in_cabin') {
         dynamicObstacles.push({ x: npc.x, y: npc.y, radius: 0.3 });
@@ -342,7 +370,10 @@ export class GameEngine {
             label = "Force Cabin Door (Hold E 1s - Danger)";
           }
         } else if (item.id === 'relic_kaal_mani') {
-          label = hasChant ? 'Examine the Kaal Mani' : 'Touch the Kaal Mani (Hold E 1s - Danger)';
+          label = hasChant ? 'Speak the chant (Hold E 2s)' : 'Touch the Kaal Mani (Hold E 1s - Danger)';
+        } else if (item.id === 'starboard_winch') {
+          const launched = useLoopStore.getState().lifeboatsLaunched;
+          label = launched ? 'Davit Winch Plate (Lifeboats Launched)' : 'Lower Lifeboats (Hold E 10s)';
         } else if (item.id === 'quarterdeck_strongbox') {
           const loopStore = useLoopStore.getState();
           if (loopStore.strongboxJammed) {
@@ -396,6 +427,10 @@ export class GameEngine {
     // Check live NPCs on current scene
     for (const npc of currentNpcs) {
       if (npc.scene !== this.scene || npc.activity === 'in_cabin') continue;
+      // Do not let evacuating crew members steal interaction from the winch
+      if (evacuatingIds.includes(npc.id) && (this.winchHoldTimer > 0 || lifeboatsLaunched)) {
+        continue;
+      }
       const dist = Math.hypot(this.player.x - npc.x, this.player.y - npc.y);
       if (dist <= CONFIG.INTERACT_RADIUS && dist < minDistance) {
         closest = {
@@ -410,6 +445,15 @@ export class GameEngine {
           highlightSize: { width: 0.8, height: 0.8, offsetX: 0.1, offsetY: 0.1 },
         };
         minDistance = dist;
+      }
+    }
+
+    // Keep active interactable locked to starboard_winch while holding the winch
+    const distToWinch = Math.hypot(this.player.x - 12.5, this.player.y - 11.5);
+    if (this.winchHoldTimer > 0 && distToWinch <= 2.5) {
+      const winchItem = activeMap.interactables.find((i) => i.id === 'starboard_winch');
+      if (winchItem) {
+        closest = { ...winchItem, label: 'Lower Lifeboats (Hold E 10s)' };
       }
     }
     this.activeInteractable = closest;
@@ -435,12 +479,14 @@ export class GameEngine {
         this.dangerTargetId = null;
 
         if (isDangerousCabinDoor) {
+          triggerMoment('shot');
           playGunshot();
           this.screenShake.trigger(14, 0.8);
           addKnowledge('K_SAFE_CODE');
           this.loopManager.handleDeath('shot by Nakhuda');
           return;
         } else if (isDangerousRelic) {
+          triggerMoment('kaal_mani');
           this.screenShake.trigger(15, 1.2);
           addKnowledge('K_CHANT');
           this.loopManager.handleDeath('vaporized by Kaal Mani');
@@ -450,6 +496,59 @@ export class GameEngine {
     } else {
       this.dangerHoldTimer = 0;
       this.dangerTargetId = null;
+    }
+
+    // 7b2. Lifeboat Launch Winch Hold (Hold E for 10 seconds, releasing resets)
+    const isWinchAction =
+      (this.activeInteractable?.id === 'starboard_winch' || (this.winchHoldTimer > 0 && distToWinch <= 2.5)) &&
+      this.scene === 'deck' &&
+      !useLoopStore.getState().lifeboatsLaunched;
+
+    if (isWinchAction && this.input.isActionPressed('interact')) {
+      this.winchHoldTimer += dt;
+      if (this.winchHoldTimer >= 10.0) {
+        this.winchHoldTimer = 0;
+        useLoopStore.getState().launchLifeboats();
+        this.messageBanner = 'Lifeboats lowered into the sea. The crew has escaped.';
+        this.messageTimer = 3.5;
+      }
+    } else {
+      this.winchHoldTimer = 0;
+    }
+
+    // 7b3. The Chant at Kaal Mani (Hold E for 2 seconds, releasing resets)
+    const distToRelic = Math.hypot(this.player.x - 3.5, this.player.y - 17.5);
+    const isChantAction =
+      (this.activeInteractable?.id === 'relic_kaal_mani' || (this.chantHoldTimer > 0 && distToRelic <= 2.5)) &&
+      this.scene === 'hold' &&
+      hasChant;
+
+    if (isChantAction && this.input.isActionPressed('interact')) {
+      this.chantHoldTimer += dt;
+      if (this.chantHoldTimer >= 2.0) {
+        this.chantHoldTimer = 0;
+        const boatsLaunched = useLoopStore.getState().lifeboatsLaunched;
+        if (shipTime > 590) {
+          // Failure case: Water already in the hold
+          this.screenShake.trigger(12, 0.8);
+          this.loopManager.handleDeath('Too late. The water is already in the hold.');
+          return;
+        } else if (!boatsLaunched) {
+          // Failure case: Crew still aboard
+          this.screenShake.trigger(12, 0.8);
+          this.loopManager.handleDeath('The crew is still aboard.');
+          return;
+        } else {
+          // Success: The Hero's Sacrifice Ending
+          useMemoryStore.getState().recordEnding('hero');
+          useUIStore.getState().playCutscene('ending_hero', () => {
+            useUIStore.getState().setGameScreen('title');
+          });
+          return;
+        }
+      }
+    } else {
+      this.chantHoldTimer = 0;
     }
 
     // 7c. Continuous Deckhand Eavesdropping timer (Hold E for 3 seconds between 310 and 335s)
@@ -468,6 +567,7 @@ export class GameEngine {
 
       if (this.eavesdropHoldTimer >= 3.0) {
         this.eavesdropHoldTimer = 0;
+        triggerMoment('meeting');
         addKnowledge('K_MUTINEER', {
           id: 'clue_deckhand_eavesdrop',
           tab: 'Clues',
@@ -583,8 +683,8 @@ export class GameEngine {
     if (interactable.id === 'relic_kaal_mani') {
       const memory = useMemoryStore.getState();
       if (memory.knowledge.includes('K_CHANT')) {
-        this.messageBanner = 'The Kaal Mani pulses cold against your palm. The chant shields you from its dark hum.';
-        this.messageTimer = 3.5;
+        this.messageBanner = 'Hold [E] for 2 seconds to speak the chant.';
+        this.messageTimer = 3.0;
         return;
       }
       // Without K_CHANT, touching is deadly and requires 1.0s danger hold
@@ -593,7 +693,19 @@ export class GameEngine {
       return;
     }
 
-    // 2b. Strongbox on Quarterdeck (3-digit lock)
+    // 2b. Starboard Davit Winch Plate
+    if (interactable.id === 'starboard_winch') {
+      const launched = useLoopStore.getState().lifeboatsLaunched;
+      if (launched) {
+        this.messageBanner = 'The lifeboats have already been lowered and launched.';
+      } else {
+        this.messageBanner = 'Hold [E] for 10 seconds to lower the lifeboats.';
+      }
+      this.messageTimer = 3.0;
+      return;
+    }
+
+    // 2c. Strongbox on Quarterdeck (3-digit lock)
     if (interactable.id === 'quarterdeck_strongbox') {
       const loopStore = useLoopStore.getState();
       if (loopStore.strongboxJammed) {
@@ -610,7 +722,7 @@ export class GameEngine {
       return;
     }
 
-    // 2c. Silver Locket on Main Deck near Hatch
+    // 2d. Silver Locket on Main Deck near Hatch
     if (interactable.id === 'deck_locket') {
       const loopStore = useLoopStore.getState();
       if (loopStore.hasPickedDeckLocketThisLoop) {
@@ -626,11 +738,9 @@ export class GameEngine {
       return;
     }
 
-    // 2d. Petrified Statue in Cargo Hold
+    // 2e. Petrified Statue in Cargo Hold
     if (interactable.id === 'statue_figure') {
-      if (typeof (window as any).triggerMoment === 'function') {
-        (window as any).triggerMoment('statue');
-      }
+      triggerMoment('statue');
       const memory = useMemoryStore.getState();
       const loop = useLoopStore.getState();
       const hasChant = memory.knowledge.includes('K_CHANT');
@@ -805,6 +915,52 @@ export class GameEngine {
     }
   }
 
+  private getEvacuatingNpcStates(shipTime: number): NpcScheduleState[] {
+    const rawNpcs = NpcScheduler.getAllNpcStates(shipTime);
+    const lifeboatsLaunched = useLoopStore.getState().lifeboatsLaunched;
+    const isWinchHolding = this.winchHoldTimer > 0 && !lifeboatsLaunched;
+    const winchProgress = Math.min(1.0, this.winchHoldTimer / 10.0);
+
+    const evacuatingIds = ['bhima', 'isha', 'hari'];
+    if (shipTime < 360) {
+      evacuatingIds.push('nakhuda');
+    }
+
+    const lifeboatBoardingSpots: Record<string, { x: number; y: number }> = {
+      hari: { x: 13.5, y: 11.0 },
+      bhima: { x: 13.5, y: 12.0 },
+      isha: { x: 13.5, y: 13.0 },
+      nakhuda: { x: 13.5, y: 14.0 },
+    };
+
+    return rawNpcs
+      .filter((npc) => {
+        if (lifeboatsLaunched && evacuatingIds.includes(npc.id)) {
+          return false;
+        }
+        return true;
+      })
+      .map((npc) => {
+        if (isWinchHolding && evacuatingIds.includes(npc.id)) {
+          const target = lifeboatBoardingSpots[npc.id] || { x: 13.5, y: 12.0 };
+          const curX = npc.scene === 'deck' ? npc.x : 8.0;
+          const curY = npc.scene === 'deck' ? npc.y : 11.0;
+          const interpX = curX + (target.x - curX) * winchProgress;
+          const interpY = curY + (target.y - curY) * winchProgress;
+          return {
+            ...npc,
+            scene: 'deck' as const,
+            x: interpX,
+            y: interpY,
+            activity: 'evacuating',
+            isMoving: true,
+            facing: 'right' as const,
+          };
+        }
+        return npc;
+      });
+  }
+
   public getReadonlyState(): ReadonlyGameState {
     const shakeOffset = this.screenShake.getOffset();
     const shipTime = useLoopStore.getState().shipTime;
@@ -814,7 +970,7 @@ export class GameEngine {
     const progress = this.inkFadeTimer > 0 ? 1 - this.inkFadeTimer / this.INK_FADE_DURATION : 0;
     const inkFadeAlpha = this.inkFadeTimer > 0 ? Math.sin(progress * Math.PI) : 0;
 
-    const npcs = NpcScheduler.getAllNpcStates(shipTime);
+    const npcs = this.getEvacuatingNpcStates(shipTime);
     const mutineers = NpcScheduler.getMutineers(shipTime);
     const eventStatus = EventScheduler.getEventStatus(shipTime);
 
@@ -843,6 +999,9 @@ export class GameEngine {
       dangerHoldProgress: Math.min(1.0, this.dangerHoldTimer / 1.0),
       dangerTargetId: this.dangerTargetId,
       hasPickedDeckLocket: useLoopStore.getState().hasPickedDeckLocketThisLoop,
+      winchHoldProgress: Math.min(1.0, this.winchHoldTimer / 10.0),
+      chantHoldProgress: Math.min(1.0, this.chantHoldTimer / 2.0),
+      lifeboatsLaunched: useLoopStore.getState().lifeboatsLaunched,
     };
   }
 }

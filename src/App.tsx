@@ -12,6 +12,7 @@ import { Journal } from './ui/Journal';
 import { RoleCard } from './ui/RoleCard';
 import { StrongboxKeypad } from './ui/StrongboxKeypad';
 import { TitleScreen } from './ui/TitleScreen';
+import { CutscenePlayer } from './ui/CutscenePlayer';
 import { useUIStore } from './store/uiStore';
 
 export const App: React.FC = () => {
@@ -134,6 +135,9 @@ export const App: React.FC = () => {
 
         {/* Strongbox 3-Digit Keypad Overlay */}
         <StrongboxKeypad />
+
+        {/* Cinematic Cutscene Player Overlay */}
+        <CutscenePlayer />
 
         {/* Dev Debug Panel - Only present during development, stripped in itch.io production build */}
         {import.meta.env.DEV && (

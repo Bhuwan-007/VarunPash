@@ -208,7 +208,7 @@ export function createDeckMap(): GameMap {
       width: 1,
       height: 1,
       type: 'helm',
-      label: 'Davit Winch Plate (Controls Lifeboat Tackle)',
+      label: 'Lower Lifeboats (Hold E 10s)',
       highlightSize: { width: 0.65, height: 0.65, offsetX: 0.18, offsetY: 0.18 },
     },
     {

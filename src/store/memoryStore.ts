@@ -42,9 +42,10 @@ export interface MemoryState {
     rememberedText?: string,
     shipTimeAtDeath?: number
   ) => { strategic: boolean };
-  newGame: () => void;
+  newGame: (fullReset?: boolean) => void;
   setPlayerRole: (role: 'navigator' | 'quartermaster' | 'deckhand') => void;
   recordGullSighting: (loopNumber: number) => boolean;
+  recordEnding: (endingId: string) => void;
 }
 
 
@@ -176,16 +177,17 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     return { strategic };
   },
 
-  newGame: () => {
+  newGame: (fullReset: boolean = false) => {
     const roles: ('navigator' | 'quartermaster' | 'deckhand')[] = ['navigator', 'quartermaster', 'deckhand'];
     const randomRole = roles[Math.floor(Math.random() * roles.length)];
+    const existingEndings = fullReset ? [] : get().endingsSeen;
     const fresh: MemoryState = {
       playerRole: randomRole,
       knowledge: [],
       journal: [],
       unreadTabs: {},
       deathCount: 0,
-      endingsSeen: [],
+      endingsSeen: existingEndings,
       ghost: null,
       lastDeathStrategic: false,
       lastDeathRemembered: null,
@@ -198,10 +200,20 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       newGame: get().newGame,
       setPlayerRole: get().setPlayerRole,
       recordGullSighting: get().recordGullSighting,
+      recordEnding: get().recordEnding,
     };
 
     set(fresh);
     savePersistedState(fresh);
+  },
+
+  recordEnding: (endingId: string) => {
+    const state = get();
+    if (!state.endingsSeen.includes(endingId)) {
+      const nextEndings = [...state.endingsSeen, endingId];
+      set({ endingsSeen: nextEndings });
+      savePersistedState(get());
+    }
   },
 
   setPlayerRole: (role) => {

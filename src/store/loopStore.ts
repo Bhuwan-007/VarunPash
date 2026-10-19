@@ -22,6 +22,7 @@ export interface LoopState {
   strongboxJammed: boolean;
   strongboxWrongAttempts: number;
   hasPickedDeckLocketThisLoop: boolean;
+  lifeboatsLaunched: boolean;
 
   // Actions
   reset: (startTime?: number, defaultSpawn?: { x: number; y: number }) => void;
@@ -41,6 +42,7 @@ export interface LoopState {
   openStrongbox: () => void;
   recordWrongStrongboxAttempt: () => boolean;
   pickDeckLocket: () => void;
+  launchLifeboats: () => void;
 }
 
 export function getStartingInventoryForRole(role: 'navigator' | 'quartermaster' | 'deckhand' | null | undefined): {
@@ -80,6 +82,7 @@ export const useLoopStore = create<LoopState>((set, get) => ({
   strongboxJammed: false,
   strongboxWrongAttempts: 0,
   hasPickedDeckLocketThisLoop: false,
+  lifeboatsLaunched: false,
 
   reset: (startTime?: number, defaultSpawn = { x: 7, y: 10 }) => {
     const targetStartTime =
@@ -97,6 +100,7 @@ export const useLoopStore = create<LoopState>((set, get) => ({
       strongboxJammed: false,
       strongboxWrongAttempts: 0,
       hasPickedDeckLocketThisLoop: false,
+      lifeboatsLaunched: false,
       npcStates: {},
       playerPos: defaultSpawn,
       scene: 'deck',
@@ -206,5 +210,9 @@ export const useLoopStore = create<LoopState>((set, get) => ({
   pickDeckLocket: () => {
     set({ hasPickedDeckLocketThisLoop: true });
     get().addItem('Silver Locket');
+  },
+
+  launchLifeboats: () => {
+    set({ lifeboatsLaunched: true });
   },
 }));

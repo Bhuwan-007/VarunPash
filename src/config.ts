@@ -9,7 +9,7 @@ export const CONFIG = {
   MAKARA_AT: 480,       // ship time (T-2:00)
   SINK_AT: 600,
   PLAYER_SPEED: 3.2,    // tiles per second
-  INTERACT_RADIUS: 1.2, // tiles
+  INTERACT_RADIUS: 1.6, // tiles (generous for 1-tile solid props)
   GHOST_HZ: 10,
   TIME_SCALE: 1,        // debug: set >1 to speed up testing
   CANVAS_WIDTH: 1280,

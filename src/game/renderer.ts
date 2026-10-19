@@ -67,7 +67,7 @@ export class GameRenderer {
         const screenX = tx * TILE_SIZE - effectiveCamX;
         const screenY = ty * TILE_SIZE - effectiveCamY;
 
-        this.drawTile(tile, screenX, screenY, TILE_SIZE, tx, ty, state.scene, frameTime, state.playerRole);
+        this.drawTile(tile, screenX, screenY, TILE_SIZE, tx, ty, state.scene, frameTime, state.playerRole, state.lifeboatsLaunched);
       }
     }
 
@@ -225,9 +225,13 @@ export class GameRenderer {
     const playerScreenY = player.y * TILE_SIZE - effectiveCamY;
     this.drawPlayer(player, playerScreenX, playerScreenY, state.playerRole);
 
-    // Danger confirmation progress ring (1.0s hold)
+    // Hold confirmation progress rings (1.0s danger, 10s winch, 2s chant)
     if (state.dangerHoldProgress > 0) {
-      this.drawDangerRing(playerScreenX + TILE_SIZE / 2, playerScreenY + TILE_SIZE / 2, state.dangerHoldProgress);
+      this.drawDangerRing(playerScreenX + TILE_SIZE / 2, playerScreenY + TILE_SIZE / 2, state.dangerHoldProgress, 'HOLDING [E]...', PALETTE.BloodRust);
+    } else if (state.winchHoldProgress > 0) {
+      this.drawDangerRing(playerScreenX + TILE_SIZE / 2, playerScreenY + TILE_SIZE / 2, state.winchHoldProgress, 'LOWERING BOATS...', PALETTE.Lantern);
+    } else if (state.chantHoldProgress > 0) {
+      this.drawDangerRing(playerScreenX + TILE_SIZE / 2, playerScreenY + TILE_SIZE / 2, state.chantHoldProgress, 'SPEAKING CHANT...', PALETTE.TideGlow);
     }
 
     // --- LAYER 4: Atmospheric Lighting & Lanterns ---
@@ -394,7 +398,8 @@ export class GameRenderer {
     tileY: number,
     scene: 'deck' | 'hold',
     time: number,
-    playerRole: 'navigator' | 'quartermaster' | 'deckhand' = 'deckhand'
+    playerRole: 'navigator' | 'quartermaster' | 'deckhand' = 'deckhand',
+    lifeboatsLaunched: boolean = false
   ): void {
     const { ctx } = this;
 
@@ -859,6 +864,44 @@ export class GameRenderer {
       }
 
       case 'lifeboat': {
+        if (lifeboatsLaunched) {
+          // Empty davits with dangling tackle ropes
+          ctx.fillStyle = 'rgba(14, 38, 52, 0.2)';
+          ctx.fillRect(screenX, screenY, size, size);
+
+          // Lowered tackle ropes hanging down into water
+          ctx.strokeStyle = '#6b7280';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(screenX + 16, screenY + 4);
+          ctx.lineTo(screenX + 16, screenY + size + 8);
+          ctx.moveTo(screenX + size - 16, screenY + 4);
+          ctx.lineTo(screenX + size - 16, screenY + size + 8);
+          ctx.stroke();
+
+          // Drifting lowered lifeboat out in the water to the starboard side
+          const driftX = screenX + 36 + Math.sin(time * 0.9) * 4;
+          const driftY = screenY + 8 + Math.cos(time * 0.9) * 3;
+
+          // Boat Hull
+          ctx.fillStyle = '#d1d5db';
+          ctx.beginPath();
+          ctx.ellipse(driftX + size / 2, driftY + size / 2, size / 2 - 4, size / 3, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#4b5563';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Crew silhouettes aboard drifting cutter
+          ctx.fillStyle = '#1e293b';
+          ctx.beginPath();
+          ctx.arc(driftX + size / 2 - 12, driftY + size / 2 - 2, 4, 0, Math.PI * 2);
+          ctx.arc(driftX + size / 2, driftY + size / 2 - 4, 4, 0, Math.PI * 2);
+          ctx.arc(driftX + size / 2 + 12, driftY + size / 2 - 2, 4, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+
         // Clinker-built wooden cutter on davits
         ctx.fillStyle = 'rgba(14, 38, 52, 0.4)';
         ctx.fillRect(screenX, screenY, size, size);
@@ -2209,10 +2252,16 @@ export class GameRenderer {
   }
 
   /**
-   * Danger confirmation progress ring (1.0 second hold E).
-   * Displays radial progress arc in BloodRust with a floating danger indicator.
+   * Hold confirmation progress ring (Danger hold, Winch hold, Chant hold).
+   * Displays radial progress arc with a floating indicator pill.
    */
-  private drawDangerRing(centerX: number, centerY: number, progress: number): void {
+  private drawDangerRing(
+    centerX: number,
+    centerY: number,
+    progress: number,
+    label: string = 'HOLDING [E]...',
+    ringColor: string = PALETTE.BloodRust
+  ): void {
     const { ctx } = this;
     const radius = 34;
 
@@ -2226,7 +2275,7 @@ export class GameRenderer {
     // Background track ring
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(178, 58, 58, 0.25)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
     ctx.lineWidth = 5;
     ctx.stroke();
 
@@ -2235,28 +2284,28 @@ export class GameRenderer {
     const startAngle = -Math.PI / 2;
     const endAngle = startAngle + progress * (Math.PI * 2);
     ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-    ctx.strokeStyle = PALETTE.BloodRust;
+    ctx.strokeStyle = ringColor;
     ctx.lineWidth = 5;
     ctx.lineCap = 'round';
-    ctx.shadowColor = PALETTE.BloodRust;
+    ctx.shadowColor = ringColor;
     ctx.shadowBlur = 10;
     ctx.stroke();
 
-    // Danger badge pill above ring
+    // Badge pill above ring
     const badgeY = centerY - radius - 14;
-    const badgeW = 96;
+    const badgeW = Math.max(96, label.length * 7 + 16);
     const badgeH = 18;
-    ctx.fillStyle = 'rgba(178, 58, 58, 0.9)';
+    ctx.fillStyle = 'rgba(11, 19, 32, 0.95)';
     ctx.fillRect(centerX - badgeW / 2, badgeY - badgeH / 2, badgeW, badgeH);
-    ctx.strokeStyle = PALETTE.Bone;
+    ctx.strokeStyle = ringColor;
     ctx.lineWidth = 1;
     ctx.strokeRect(centerX - badgeW / 2, badgeY - badgeH / 2, badgeW, badgeH);
 
     ctx.fillStyle = PALETTE.Bone;
-    ctx.font = 'bold 10px monospace';
+    ctx.font = 'bold 9px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('HOLDING [E]...', centerX, badgeY);
+    ctx.fillText(label, centerX, badgeY);
 
     ctx.restore();
   }

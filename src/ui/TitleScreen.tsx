@@ -11,12 +11,13 @@ export const TitleScreen: React.FC = () => {
   const deathCount = useMemoryStore((s) => s.deathCount);
   const knowledge = useMemoryStore((s) => s.knowledge);
   const journal = useMemoryStore((s) => s.journal);
+  const endingsSeen = useMemoryStore((s) => s.endingsSeen);
 
   const hasSave = deathCount > 0 || knowledge.length > 0 || journal.length > 0;
 
   const handleNewGame = () => {
-    // Reset loop & memory
-    useMemoryStore.getState().newGame();
+    // Reset loop & memory, preserving endingsSeen unless full reset
+    useMemoryStore.getState().newGame(false);
     useLoopStore.getState().reset();
 
     // First Clues entry in player's voice (Prompt Issue 6)
@@ -150,11 +151,25 @@ export const TitleScreen: React.FC = () => {
           </button>
         </div>
 
+        {/* Endings found counter */}
+        <div
+          style={{
+            marginTop: '20px',
+            fontSize: '16px',
+            color: PALETTE.Lantern,
+            fontFamily: "'IM Fell English SC', serif, monospace",
+            letterSpacing: '3px',
+            textShadow: '0 0 10px rgba(242, 165, 65, 0.3)',
+          }}
+        >
+          Endings found: {endingsSeen.length}
+        </div>
+
         {/* Small loop save footer */}
         {hasSave && (
           <div
             style={{
-              marginTop: '24px',
+              marginTop: '12px',
               fontSize: '13px',
               color: PALETTE.Ash,
               fontFamily: 'monospace',

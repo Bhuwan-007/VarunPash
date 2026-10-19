@@ -3,6 +3,7 @@ import { useLoopStore } from '../../store/loopStore';
 import { useMemoryStore } from '../../store/memoryStore';
 import { useUIStore } from '../../store/uiStore';
 import { DialogueManager } from '../dialogue/dialogueManager';
+import { triggerMoment } from './moments';
 
 export class LoopManager {
   private isDying: boolean = false;
@@ -94,6 +95,10 @@ export class LoopManager {
       this.onPlayerRespawnCallback('deck', defaultDeckSpawn);
     }
 
+    if (memoryState.deathCount >= 1) {
+      triggerMoment('wake');
+    }
+
     this.isDying = false;
   }
 
@@ -134,7 +139,7 @@ export class LoopManager {
     const uiStore = useUIStore.getState();
 
     // 1. Reset memory store (clears knowledge, journal, endingsSeen, deathCount = 0, re-rolls playerRole)
-    memoryState.newGame();
+    memoryState.newGame(true);
 
     // Reset dialogue seen states for a fresh game
     DialogueManager.resetShownLines();
