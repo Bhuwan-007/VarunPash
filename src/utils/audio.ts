@@ -218,3 +218,36 @@ export function playKnifeStab(): void {
   }
 }
 
+/**
+ * Synthesizes a crisp double-rap wooden knock on oak cabin doors.
+ */
+export function playDoorKnock(): void {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const knockTimes = [0, 0.12];
+    knockTimes.forEach((delay) => {
+      const startTime = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(260, startTime);
+      osc.frequency.exponentialRampToValueAtTime(90, startTime + 0.08);
+
+      gain.gain.setValueAtTime(0.35, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.08);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + 0.09);
+    });
+  } catch (err) {
+    console.debug('Door knock audio skipped:', err);
+  }
+}
+
+

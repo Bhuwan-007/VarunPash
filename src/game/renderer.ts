@@ -203,17 +203,8 @@ export class GameRenderer {
       }
     }
 
-    // 3c2. Floating Event BARKS above NPC head (2.5s duration)
-    if (state.barks && state.barks.length > 0) {
-      for (const bark of state.barks) {
-        const npc = state.npcs.find((n) => n.id === bark.npcId);
-        if (npc && npc.scene === state.scene && npc.activity !== 'in_cabin') {
-          const nx = npc.x * TILE_SIZE - effectiveCamX;
-          const ny = npc.y * TILE_SIZE - effectiveCamY;
-          this.drawNpcBark(nx, ny, bark.text);
-        }
-      }
-    }
+    // 3c2. Floating Event BARKS above NPC head (2.5s duration, max 2, staggered, clamped, non-overlapping)
+    this.renderBarks(state, effectiveCamX, effectiveCamY);
 
     // 3d. Gull Omen on main mast (Deck scene, 355-360)
     if (state.scene === 'deck' && state.eventStatus.gullPresent) {
@@ -1997,51 +1988,177 @@ export class GameRenderer {
   }
 
   /**
-   * Floating Event BARK speech bubble above NPC head (2.5s duration, within 8 tiles).
+   * Floating Event BARK speech bubbles:
+   * - Max 2 bubbles on screen at once
+   * - Max width 280 px
+   * - Clamped to viewport
+   * - Anchored above NPC head
+   * - Never overlap each other
+   * - Hidden while dialogue, journal, or moment is open
    */
-  private drawNpcBark(nx: number, ny: number, text: string): void {
+  private renderBarks(state: ReadonlyGameState, effectiveCamX: number, effectiveCamY: number): void {
+    if (state.isOverlayOpen || !state.barks || state.barks.length === 0) {
+      return;
+    }
+
     const { ctx } = this;
-    ctx.save();
-    ctx.font = 'bold 13px monospace';
-    const textWidth = ctx.measureText(text).width;
-    const boxW = textWidth + 24;
-    const boxH = 26;
-    const boxX = nx - boxW / 2;
-    const boxY = ny - 68;
+    const { TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT } = CONFIG;
 
-    // Speech bubble background
-    ctx.fillStyle = 'rgba(7, 9, 15, 0.95)';
-    ctx.fillRect(boxX, boxY, boxW, boxH);
+    interface BubbleLayout {
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      anchorX: number;
+      anchorY: number;
+      lines: string[];
+    }
 
-    // Border in Lantern gold
-    ctx.strokeStyle = PALETTE.Lantern;
-    ctx.lineWidth = 1.8;
-    ctx.strokeRect(boxX, boxY, boxW, boxH);
+    const layouts: BubbleLayout[] = [];
+    const visibleBarks = state.barks.slice(0, 2);
 
-    // Small downward pointer triangle
-    ctx.fillStyle = 'rgba(7, 9, 15, 0.95)';
-    ctx.beginPath();
-    ctx.moveTo(nx - 6, boxY + boxH);
-    ctx.lineTo(nx, boxY + boxH + 6);
-    ctx.lineTo(nx + 6, boxY + boxH);
-    ctx.closePath();
-    ctx.fill();
+    for (const bark of visibleBarks) {
+      const npc = state.npcs.find((n) => n.id === bark.npcId);
+      if (!npc || npc.scene !== state.scene || npc.activity === 'in_cabin') {
+        continue;
+      }
 
-    ctx.strokeStyle = PALETTE.Lantern;
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(nx - 6, boxY + boxH);
-    ctx.lineTo(nx, boxY + boxH + 6);
-    ctx.lineTo(nx + 6, boxY + boxH);
-    ctx.stroke();
+      const nx = npc.x * TILE_SIZE - effectiveCamX;
+      const ny = npc.y * TILE_SIZE - effectiveCamY;
 
-    // Text in Bone
-    ctx.fillStyle = PALETTE.Bone;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, nx, boxY + boxH / 2);
+      // Word-wrap within max width (max bubble width 280px -> inner text width max 252px)
+      ctx.save();
+      ctx.font = 'bold 12px monospace';
+      const maxInnerWidth = 252;
+      const words = bark.text.split(' ');
+      const lines: string[] = [];
+      let currentLine = '';
 
-    ctx.restore();
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        const testWidth = ctx.measureText(testLine).width;
+        if (testWidth > maxInnerWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+
+      let maxLineWidth = 0;
+      for (const line of lines) {
+        const lw = ctx.measureText(line).width;
+        if (lw > maxLineWidth) maxLineWidth = lw;
+      }
+      ctx.restore();
+
+      const boxW = Math.min(280, Math.max(120, maxLineWidth + 28));
+      const lineHeight = 16;
+      const boxH = Math.max(30, lines.length * lineHeight + 14);
+
+      // Anchor above NPC's head
+      let boxX = nx - boxW / 2;
+      let boxY = ny - 64 - boxH;
+
+      // Clamp to viewport
+      const pad = 10;
+      boxX = Math.max(pad, Math.min(CANVAS_WIDTH - boxW - pad, boxX));
+      boxY = Math.max(pad, Math.min(CANVAS_HEIGHT - boxH - pad, boxY));
+
+      layouts.push({
+        x: boxX,
+        y: boxY,
+        w: boxW,
+        h: boxH,
+        anchorX: nx,
+        anchorY: ny - 32,
+        lines,
+      });
+    }
+
+    // De-collision: ensure two bubbles never overlap
+    if (layouts.length === 2) {
+      const b0 = layouts[0];
+      const b1 = layouts[1];
+
+      const overlapX = b0.x < b1.x + b1.w && b0.x + b0.w > b1.x;
+      const overlapY = b0.y < b1.y + b1.h && b0.y + b0.h > b1.y;
+
+      if (overlapX && overlapY) {
+        const gap = 8;
+        if (b0.y <= b1.y) {
+          b1.y = b0.y + b0.h + gap;
+          if (b1.y + b1.h > CANVAS_HEIGHT - 10) {
+            b1.y = CANVAS_HEIGHT - 10 - b1.h;
+            b0.y = b1.y - b0.h - gap;
+          }
+        } else {
+          b0.y = b1.y + b1.h + gap;
+          if (b0.y + b0.h > CANVAS_HEIGHT - 10) {
+            b0.y = CANVAS_HEIGHT - 10 - b0.h;
+            b1.y = b0.y - b1.h - gap;
+          }
+        }
+        b0.y = Math.max(10, Math.min(CANVAS_HEIGHT - b0.h - 10, b0.y));
+        b1.y = Math.max(10, Math.min(CANVAS_HEIGHT - b1.h - 10, b1.y));
+      }
+    }
+
+    // Render each bubble
+    for (const layout of layouts) {
+      const { x, y, w, h, anchorX, lines } = layout;
+
+      ctx.save();
+
+      // Drop shadow for legibility
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.fillRect(x + 2, y + 2, w, h);
+
+      // Speech bubble background
+      ctx.fillStyle = 'rgba(7, 9, 15, 0.95)';
+      ctx.fillRect(x, y, w, h);
+
+      // Border in Lantern gold
+      ctx.strokeStyle = PALETTE.Lantern;
+      ctx.lineWidth = 1.8;
+      ctx.strokeRect(x, y, w, h);
+
+      // Small downward pointer triangle pointing toward NPC anchor
+      const pointerX = Math.max(x + 14, Math.min(x + w - 14, anchorX));
+      ctx.fillStyle = 'rgba(7, 9, 15, 0.95)';
+      ctx.beginPath();
+      ctx.moveTo(pointerX - 6, y + h);
+      ctx.lineTo(pointerX, y + h + 6);
+      ctx.lineTo(pointerX + 6, y + h);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = PALETTE.Lantern;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(pointerX - 6, y + h);
+      ctx.lineTo(pointerX, y + h + 6);
+      ctx.lineTo(pointerX + 6, y + h);
+      ctx.stroke();
+
+      // Text in Bone
+      ctx.font = 'bold 12px monospace';
+      ctx.fillStyle = PALETTE.Bone;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const lineHeight = 16;
+      const startTextY = y + (h - (lines.length - 1) * lineHeight) / 2;
+
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], x + w / 2, startTextY + i * lineHeight);
+      }
+
+      ctx.restore();
+    }
   }
 
   /**

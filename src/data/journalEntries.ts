@@ -52,7 +52,7 @@ export const JOURNAL_ENTRIES: Record<string, JournalEntryDef> = {
     flag: 'K_CHANT',
     tab: 'Clues',
     title: 'The Sealing Chant',
-    text: 'Seven syllables whispered in the cold deep. Spoken to the relic, they hold the black waters at bay.',
+    text: 'Seven syllables will seal the Kaal Mani. But I will not speak them while the crew is still aboard.',
   },
   K_LOCKET_TWIN: {
     id: 'entry_locket_twin',

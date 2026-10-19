@@ -214,5 +214,11 @@ export const useLoopStore = create<LoopState>((set, get) => ({
 
   launchLifeboats: () => {
     set({ lifeboatsLaunched: true });
+    useMemoryStore.getState().addJournalEntry({
+      id: 'entry_boats_away',
+      tab: 'Clues',
+      title: 'Boats Away',
+      text: 'The boats are away. Now the Kaal Mani.',
+    });
   },
 }));

@@ -2,7 +2,7 @@ import { CONFIG } from '../config';
 import { useLoopStore } from '../store/loopStore';
 import { useMemoryStore } from '../store/memoryStore';
 import { useUIStore } from '../store/uiStore';
-import { playGunshot, playKnifeStab, playMakaraRumble } from '../utils/audio';
+import { playDoorKnock, playGunshot, playKnifeStab, playMakaraRumble } from '../utils/audio';
 import { Camera } from './camera';
 import { assertWalkablePositions, DynamicObstacle, findNearestWalkableTile } from './collision';
 import { ScreenShake } from './effects/screenShake';
@@ -18,9 +18,11 @@ import { createHoldMap } from './world/holdMap';
 import { Interactable, SceneId } from './world/interactables';
 
 export interface ActiveBark {
+  id: string;
   npcId: string;
   text: string;
-  expiresAt: number;
+  remainingTime: number;
+  duration: number;
 }
 
 export interface ReadonlyGameState {
@@ -54,6 +56,7 @@ export interface ReadonlyGameState {
   readonly winchHoldProgress: number;
   readonly chantHoldProgress: number;
   readonly lifeboatsLaunched: boolean;
+  readonly isOverlayOpen: boolean;
 }
 
 export class GameEngine {
@@ -85,7 +88,18 @@ export class GameEngine {
   private navigatorKnockIndex: number = 0;
 
   private activeBarks: ActiveBark[] = [];
-  private triggeredBarkEvents: Set<string> = new Set();
+  private pendingBarkQueue: { id: string; npcId: string; text: string }[] = [];
+  private triggeredBarkIds: Set<string> = new Set();
+  private barkStaggerTimer: number = 0;
+  private ambientBarkTimer: number = 0;
+
+  public clearBarks(): void {
+    this.activeBarks = [];
+    this.pendingBarkQueue = [];
+    this.triggeredBarkIds.clear();
+    this.barkStaggerTimer = 0;
+    this.ambientBarkTimer = 0;
+  }
 
   private isRunning: boolean = false;
   private lastTimestamp: number = 0;
@@ -127,6 +141,7 @@ export class GameEngine {
     // Setup loopManager callbacks
     this.loopManager.setCallbacks({
       onRespawn: (startScene, startPos) => {
+        this.clearBarks();
         this.scene = startScene;
         const activeMap = this.getActiveMap();
         const safePos = findNearestWalkableTile(activeMap, startPos.x, startPos.y);
@@ -154,6 +169,9 @@ export class GameEngine {
       },
       onShake: (intensity, duration) => {
         this.screenShake.trigger(intensity, duration);
+      },
+      onDeath: () => {
+        this.clearBarks();
       },
     });
   }
@@ -220,8 +238,10 @@ export class GameEngine {
     // 2. Update screen shake
     this.screenShake.update(dt);
 
+    const prevShipTime = this.previousShipTime;
+
     // 3. Event Scheduler update (gull cries, makara rumble, sinking death)
-    this.eventScheduler.update(shipTime, this.previousShipTime, {
+    this.eventScheduler.update(shipTime, prevShipTime, {
       onShake: (intensity, duration) => this.screenShake.trigger(intensity, duration),
       onDeath: (cause) => {
         if (cause.includes('drown')) {
@@ -230,10 +250,10 @@ export class GameEngine {
         this.loopManager.handleDeath(cause);
       },
     });
-    this.previousShipTime = shipTime;
 
     // If death sequence is active, freeze movement
     if (this.loopManager.isDeathInProgress()) {
+      this.previousShipTime = shipTime;
       this.input.endFrame();
       return;
     }
@@ -317,10 +337,46 @@ export class GameEngine {
       }
     }
 
-    // 5b. Update event BARKS (2.5s duration, within 8 tiles, unpaused)
-    this.activeBarks = this.activeBarks.filter((b) => b.expiresAt > shipTime);
-    if (!isPlayerLocked) {
-      this.checkEventBarks(shipTime, currentNpcs);
+    // 5b. Update active BARKS and queues
+    const isPaused = useLoopStore.getState().isPaused || isPlayerLocked;
+    if (!isPaused) {
+      // 1. Tick remaining time on active barks (freezes while paused/overlay open)
+      for (const bark of this.activeBarks) {
+        bark.remainingTime -= dt;
+      }
+      this.activeBarks = this.activeBarks.filter((b) => b.remainingTime > 0);
+
+      // 2. Decrement stagger timer
+      if (this.barkStaggerTimer > 0) {
+        this.barkStaggerTimer -= dt;
+      }
+
+      // 3. Promote queued barks to active barks:
+      // Rules: max 1 bark per NPC, at most 2 bubbles on screen at once, stagger starts by 0.4s
+      while (
+        this.barkStaggerTimer <= 0 &&
+        this.activeBarks.length < 2 &&
+        this.pendingBarkQueue.length > 0
+      ) {
+        const nextIdx = this.pendingBarkQueue.findIndex(
+          (q) => !this.activeBarks.some((b) => b.npcId === q.npcId)
+        );
+        if (nextIdx === -1) break;
+
+        const [nextBark] = this.pendingBarkQueue.splice(nextIdx, 1);
+        this.activeBarks.push({
+          id: nextBark.id,
+          npcId: nextBark.npcId,
+          text: nextBark.text,
+          remainingTime: 2.5,
+          duration: 2.5,
+        });
+        this.barkStaggerTimer = 0.4;
+      }
+
+      // 4. Check live event time crossings and ambient lines
+      this.checkEventBarks(shipTime, currentNpcs, prevShipTime);
+      this.checkAmbientBarks(dt, shipTime, currentNpcs);
     }
 
     // Sync player tile position with loopStore
@@ -360,10 +416,13 @@ export class GameEngine {
         // Dynamic labels based on role and shipTime
         let label = item.label;
         if (item.id === 'captain_door') {
-          if (playerRole === 'navigator') {
-            label = "Knock on Captain's Door";
+          const lifeboatsLaunched = useLoopStore.getState().lifeboatsLaunched;
+          if (lifeboatsLaunched) {
+            label = "The cabin door is open; Nakhuda has escaped on the lifeboats.";
           } else if (shipTime >= 360) {
-            label = "Examine Nakhuda's Cabin Door (Ajar)";
+            label = "The door is ajar; Nakhuda lies fallen on the quarterdeck.";
+          } else if (playerRole === 'navigator') {
+            label = "Knock on Captain's Door";
           } else if (shipTime >= 240 && shipTime <= 270) {
             label = "Enter Nakhuda's Cabin (Unlocked)";
           } else {
@@ -461,6 +520,7 @@ export class GameEngine {
     // 7b. Danger Confirmation Hold Check (Hold E for 1.0 second, releasing cancels)
     const isDangerousCabinDoor =
       this.activeInteractable?.id === 'captain_door' &&
+      !lifeboatsLaunched &&
       playerRole !== 'navigator' &&
       (shipTime < 240 || (shipTime > 270 && shipTime < 360));
 
@@ -640,6 +700,7 @@ export class GameEngine {
       }
     }
 
+    this.previousShipTime = shipTime;
     this.input.endFrame();
   }
 
@@ -648,7 +709,22 @@ export class GameEngine {
 
     // 1. Captain's cabin door
     if (interactable.id === 'captain_door') {
+      const lifeboatsLaunched = useLoopStore.getState().lifeboatsLaunched;
+      if (lifeboatsLaunched) {
+        this.messageBanner = "The cabin door is open; Nakhuda has escaped on the lifeboats.";
+        this.messageTimer = 3.0;
+        return;
+      }
+
+      if (shipTime >= 360) {
+        // Nakhuda was killed in the mutiny outside; door is ajar, no danger!
+        this.messageBanner = "The door is ajar; Nakhuda lies fallen on the quarterdeck.";
+        this.messageTimer = 3.0;
+        return;
+      }
+
       if (playerRole === 'navigator') {
+        playDoorKnock();
         if (this.navigatorKnockIndex === 0) {
           this.messageBanner = "Thorne (through door): 'Is that you, Navigator? Keep to your charts! The compass is dead, but the wheel must hold!'";
           this.navigatorKnockIndex = 1;
@@ -657,13 +733,6 @@ export class GameEngine {
           this.navigatorKnockIndex = 0;
         }
         this.messageTimer = 4.0;
-        return;
-      }
-
-      if (shipTime >= 360) {
-        // Nakhuda was killed in the mutiny outside; door is ajar, no danger!
-        this.messageBanner = "The door is ajar; Nakhuda lies fallen on the quarterdeck.";
-        this.messageTimer = 3.0;
         return;
       }
 
@@ -878,40 +947,112 @@ export class GameEngine {
     }
   }
 
-  private checkEventBarks(shipTime: number, currentNpcs: NpcScheduleState[]): void {
-    const checkAndAdd = (eventId: string, npcId: string, text: string) => {
-      if (this.triggeredBarkEvents.has(eventId)) return;
-      const npc = currentNpcs.find((n) => n.id === npcId);
-      if (!npc || npc.scene !== this.scene || npc.activity === 'in_cabin') return;
-      const dist = Math.hypot(this.player.x - npc.x, this.player.y - npc.y);
-      if (dist <= 8.0) {
-        this.triggeredBarkEvents.add(eventId);
-        this.activeBarks.push({ npcId, text, expiresAt: shipTime + 2.5 });
-      }
-    };
+  private checkEventBarks(shipTime: number, currentNpcs: NpcScheduleState[], prevShipTime: number): void {
+    const crossedLive = (t: number) => prevShipTime < t && shipTime >= t;
 
     // Gull at 355 (Bhima)
-    if (shipTime >= 355 && shipTime < 360) {
-      checkAndAdd('gull_355_bhima', 'bhima', 'Look at the spar... three cries! An omen of drowning!');
+    if (crossedLive(355)) {
+      this.queueBark('gull_355_bhima', 'bhima', 'Look at the spar... three cries! An omen of drowning!');
     }
 
     // Mutiny at 360 (Bhima, Isha, Hari)
-    if (shipTime >= 360 && shipTime < 366) {
-      checkAndAdd('mutiny_360_bhima', 'bhima', "Gunfire in the captain's cabin! Thorne is down!");
-      checkAndAdd('mutiny_360_isha', 'isha', 'Stand clear of the battery! Mutineers on deck!');
-      checkAndAdd('mutiny_360_hari', 'hari', 'Mutiny! Keep clear of the lifeboats if you value your life!');
+    if (crossedLive(360)) {
+      this.queueBark('mutiny_360_bhima', 'bhima', "Gunfire in the captain's cabin! Thorne is down!");
+      this.queueBark('mutiny_360_isha', 'isha', 'Stand clear of the battery! Mutineers on deck!');
+      this.queueBark('mutiny_360_hari', 'hari', 'Mutiny! Keep clear of the lifeboats if you value your life!');
     }
 
     // Makara telegraph at 470 (Isha, Hari)
-    if (shipTime >= 470 && shipTime < 480) {
-      checkAndAdd('makara_470_isha', 'isha', "Water's boiling on the port side! Something massive is rising!");
-      checkAndAdd('makara_470_hari', 'hari', 'Listen to that timber groan... sea demon in the deep!');
+    if (crossedLive(470)) {
+      this.queueBark('makara_470_isha', 'isha', "Water's boiling on the port side! Something massive is rising!");
+      this.queueBark('makara_470_hari', 'hari', 'Listen to that timber groan... sea demon in the deep!');
     }
 
     // Makara breach at 480 (Isha, Hari)
-    if (shipTime >= 480 && shipTime < 490) {
-      checkAndAdd('makara_480_isha', 'isha', 'Makara! Fire the broadside! Aim for the glowing throat!');
-      checkAndAdd('makara_480_hari', 'hari', 'Sweet sea mercy, the jaw on that beast! We are dead men!');
+    if (crossedLive(480)) {
+      this.queueBark('makara_480_isha', 'isha', 'Makara! Fire the broadside! Aim for the glowing throat!');
+      this.queueBark('makara_480_hari', 'hari', 'Sweet sea mercy, the jaw on that beast! We are dead men!');
+    }
+  }
+
+  private queueBark(id: string, npcId: string, text: string): void {
+    if (this.triggeredBarkIds.has(id)) return;
+    if (this.activeBarks.some((b) => b.npcId === npcId)) return;
+    if (this.pendingBarkQueue.some((q) => q.npcId === npcId)) return;
+
+    this.triggeredBarkIds.add(id);
+    this.pendingBarkQueue.push({ id, npcId, text });
+  }
+
+  private checkAmbientBarks(dt: number, shipTime: number, currentNpcs: NpcScheduleState[]): void {
+    const eventStatus = EventScheduler.getEventStatus(shipTime);
+    const inEventPhase = eventStatus.phase === 'mutiny' || eventStatus.phase === 'makara';
+    const lifeboatsLaunched = useLoopStore.getState().lifeboatsLaunched;
+
+    if (!inEventPhase || lifeboatsLaunched) {
+      this.ambientBarkTimer = 0;
+      return;
+    }
+
+    this.ambientBarkTimer += dt;
+    if (this.ambientBarkTimer < 18.0) return; // one ambient line every 15-20 seconds
+    this.ambientBarkTimer = 0;
+
+    const eligibleIds = ['bhima', 'isha', 'hari'].filter((id) => {
+      const npc = currentNpcs.find((n) => n.id === id);
+      return (
+        npc &&
+        npc.scene === this.scene &&
+        npc.activity !== 'in_cabin' &&
+        !this.activeBarks.some((b) => b.npcId === id) &&
+        !this.pendingBarkQueue.some((q) => q.npcId === id)
+      );
+    });
+
+    if (eligibleIds.length === 0) return;
+
+    const chosenId = eligibleIds[Math.floor(shipTime / 18) % eligibleIds.length];
+    let ambientText = '';
+
+    if (eventStatus.phase === 'mutiny') {
+      const mutinyLines: Record<string, string[]> = {
+        bhima: [
+          'Keep low! Mutineers are watching the quarterdeck!',
+          "Thorne is down... who's at the helm?",
+        ],
+        isha: [
+          'Watch the shadows by the hatch!',
+          'They took the quarterdeck! Watch your back!',
+        ],
+        hari: [
+          'Mutineers have the deck! Stay clear of the rails!',
+          'Keep to the shadows if you value your skin!',
+        ],
+      };
+      const lines = mutinyLines[chosenId] ?? ['Stay alert!'];
+      ambientText = lines[Math.floor(shipTime / 36) % lines.length];
+    } else if (eventStatus.phase === 'makara') {
+      const makaraLines: Record<string, string[]> = {
+        bhima: [
+          "The hull won't take another breach like that!",
+          "It's circling beneath us in the black water!",
+        ],
+        isha: [
+          'Keep clear of the port side!',
+          'Black water rising through the scuppers!',
+        ],
+        hari: [
+          'The timber is groaning! She will tear us apart!',
+          'Sweet sea mercy, hear that roar from the deep!',
+        ],
+      };
+      const lines = makaraLines[chosenId] ?? ['Watch the water!'];
+      ambientText = lines[Math.floor(shipTime / 36) % lines.length];
+    }
+
+    if (ambientText) {
+      const barkId = `ambient_${chosenId}_${Math.floor(shipTime)}`;
+      this.queueBark(barkId, chosenId, ambientText);
     }
   }
 
@@ -1002,6 +1143,11 @@ export class GameEngine {
       winchHoldProgress: Math.min(1.0, this.winchHoldTimer / 10.0),
       chantHoldProgress: Math.min(1.0, this.chantHoldTimer / 2.0),
       lifeboatsLaunched: useLoopStore.getState().lifeboatsLaunched,
+      isOverlayOpen:
+        useUIStore.getState().journalOpen ||
+        useUIStore.getState().activeDialogue !== null ||
+        useUIStore.getState().activeCutscene !== null ||
+        useUIStore.getState().activeCutsceneId !== null,
     };
   }
 }

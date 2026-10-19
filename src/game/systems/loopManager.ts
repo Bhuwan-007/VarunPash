@@ -9,15 +9,18 @@ export class LoopManager {
   private isDying: boolean = false;
   private onPlayerRespawnCallback?: (startScene: 'deck', startPos: { x: number; y: number }) => void;
   private onScreenShakeCallback?: (intensity: number, duration: number) => void;
+  private onDeathCallback?: () => void;
 
   constructor() {}
 
   public setCallbacks(callbacks: {
     onRespawn: (startScene: 'deck', startPos: { x: number; y: number }) => void;
     onShake?: (intensity: number, duration: number) => void;
+    onDeath?: () => void;
   }): void {
     this.onPlayerRespawnCallback = callbacks.onRespawn;
     this.onScreenShakeCallback = callbacks.onShake;
+    this.onDeathCallback = callbacks.onDeath;
   }
 
   /**
@@ -27,6 +30,10 @@ export class LoopManager {
   public handleDeath(cause: string): void {
     if (this.isDying) return;
     this.isDying = true;
+
+    if (this.onDeathCallback) {
+      this.onDeathCallback();
+    }
 
     const loopState = useLoopStore.getState();
     const memoryState = useMemoryStore.getState();
