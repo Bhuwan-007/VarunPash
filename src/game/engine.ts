@@ -520,15 +520,19 @@ export class GameEngine {
       }
     }
 
-    // Check live NPCs on current scene
+    // Check live NPCs on current scene with increased contact area (2.0 tiles)
+    const NPC_INTERACT_RADIUS = 2.0;
+
     for (const npc of currentNpcs) {
       if (npc.scene !== this.scene || npc.activity === 'in_cabin') continue;
       // Do not let evacuating crew members steal interaction from the winch
       if (evacuatingIds.includes(npc.id) && (this.winchHoldTimer > 0 || lifeboatsLaunched)) {
         continue;
       }
-      const dist = Math.hypot(this.player.x - npc.x, this.player.y - npc.y);
-      if (dist <= CONFIG.INTERACT_RADIUS && dist < minDistance) {
+      const rawDist = Math.hypot(this.player.x - npc.x, this.player.y - npc.y);
+      // Give people a healthy priority bias (-0.35 tiles) so nearby NPCs take precedence over nearby props
+      const effectiveDist = rawDist - 0.35;
+      if (rawDist <= NPC_INTERACT_RADIUS && effectiveDist < minDistance) {
         closest = {
           id: 'npc_' + npc.id,
           scene: npc.scene,
@@ -538,9 +542,9 @@ export class GameEngine {
           height: 1,
           type: 'statue',
           label: npc.isDead ? 'Examine Fallen Nakhuda' : `Talk to ${npc.name}`,
-          highlightSize: { width: 0.8, height: 0.8, offsetX: 0.1, offsetY: 0.1 },
+          highlightSize: { width: 0.9, height: 0.9, offsetX: 0.05, offsetY: 0.05 },
         };
-        minDistance = dist;
+        minDistance = effectiveDist;
       }
     }
 

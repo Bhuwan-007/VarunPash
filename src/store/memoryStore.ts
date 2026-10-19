@@ -244,13 +244,13 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       const def = JOURNAL_ENTRIES['K_OMEN_GULL'];
       const journalEntry = def
         ? {
-            id: def.id,
-            tab: def.tab,
-            title: def.title,
-            text: def.text,
-            tideTime: def.tideTime,
-            loop: state.deathCount + 1,
-          }
+          id: def.id,
+          tab: def.tab,
+          title: def.title,
+          text: def.text,
+          tideTime: def.tideTime,
+          loop: state.deathCount + 1,
+        }
         : undefined;
       state.addKnowledge('K_OMEN_GULL', journalEntry);
       return true;

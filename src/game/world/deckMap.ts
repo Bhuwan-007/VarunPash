@@ -239,10 +239,10 @@ export function createDeckMap(): GameMap {
       x: 4,
       y: 11,
       width: 1,
-      height: 3,
+      height: 1.6,
       type: 'chest',
       label: 'Stacked Brine Barrels & Salt-Pork Crates',
-      highlightSize: { width: 0.7, height: 1.6, offsetX: 0.15, offsetY: 0.7 },
+      highlightSize: { width: 0.7, height: 1.4, offsetX: 0.15, offsetY: 0.1 },
     },
     {
       id: 'quarterdeck_crates',
