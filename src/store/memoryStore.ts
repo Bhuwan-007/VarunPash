@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { JOURNAL_ENTRIES } from '../data/journalEntries';
 
 export interface JournalEntry {
   id: string;
@@ -29,6 +30,7 @@ export interface MemoryState {
   lastDeathStrategic: boolean;
   lastDeathRemembered: string | null;
   shipTimeAtDeath: number | null;
+  gullSeenLoops: number[];
 
   // Actions
   addKnowledge: (flag: string, entry?: JournalEntry) => boolean;
@@ -42,6 +44,7 @@ export interface MemoryState {
   ) => { strategic: boolean };
   newGame: () => void;
   setPlayerRole: (role: 'navigator' | 'quartermaster' | 'deckhand') => void;
+  recordGullSighting: (loopNumber: number) => boolean;
 }
 
 
@@ -71,6 +74,7 @@ function savePersistedState(state: MemoryState): void {
       lastDeathStrategic: state.lastDeathStrategic,
       lastDeathRemembered: state.lastDeathRemembered,
       shipTimeAtDeath: state.shipTimeAtDeath,
+      gullSeenLoops: state.gullSeenLoops,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   } catch (err) {
@@ -91,6 +95,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   lastDeathStrategic: initialPersisted.lastDeathStrategic ?? false,
   lastDeathRemembered: initialPersisted.lastDeathRemembered ?? null,
   shipTimeAtDeath: initialPersisted.shipTimeAtDeath ?? null,
+  gullSeenLoops: (initialPersisted as any).gullSeenLoops ?? [],
 
   addKnowledge: (flag: string, entry?: JournalEntry) => {
     const state = get();
@@ -185,22 +190,50 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       lastDeathStrategic: false,
       lastDeathRemembered: null,
       shipTimeAtDeath: null,
+      gullSeenLoops: [],
       addKnowledge: get().addKnowledge,
       addJournalEntry: get().addJournalEntry,
       markTabRead: get().markTabRead,
       recordDeath: get().recordDeath,
       newGame: get().newGame,
       setPlayerRole: get().setPlayerRole,
+      recordGullSighting: get().recordGullSighting,
     };
 
     set(fresh);
     savePersistedState(fresh);
   },
 
-
   setPlayerRole: (role) => {
     set({ playerRole: role });
     savePersistedState(get());
+  },
+
+  recordGullSighting: (loopNumber: number) => {
+    const state = get();
+    if (state.gullSeenLoops.includes(loopNumber)) {
+      return false;
+    }
+    const updated = [...state.gullSeenLoops, loopNumber];
+    set({ gullSeenLoops: updated });
+    savePersistedState(get());
+
+    if (updated.length >= 3 && !state.knowledge.includes('K_OMEN_GULL')) {
+      const def = JOURNAL_ENTRIES['K_OMEN_GULL'];
+      const journalEntry = def
+        ? {
+            id: def.id,
+            tab: def.tab,
+            title: def.title,
+            text: def.text,
+            tideTime: def.tideTime,
+            loop: state.deathCount + 1,
+          }
+        : undefined;
+      state.addKnowledge('K_OMEN_GULL', journalEntry);
+      return true;
+    }
+    return false;
   },
 }));
 

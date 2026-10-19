@@ -49,6 +49,7 @@ export const IntroCutscene: React.FC = () => {
         setPanelIndex((prev) => prev + 1);
       } else {
         setGameScreen('game');
+        useUIStore.getState().openRoleCard();
       }
     }
   };

@@ -33,8 +33,15 @@ export const Hud: React.FC = () => {
   const timeScale = useLoopStore((s) => s.timeScale);
   const deathCount = useMemoryStore((s) => s.deathCount);
   const playerRole = useMemoryStore((s) => s.playerRole);
+  const knowledge = useMemoryStore((s) => s.knowledge);
   const journalPulse = useUIStore((s) => s.journalPulse);
   const toggleJournal = useUIStore((s) => s.toggleJournal);
+
+  const inventory = useLoopStore((s) => s.inventory);
+  const coins = useLoopStore((s) => s.coins);
+
+  const hasGullOmen = knowledge.includes('K_OMEN_GULL');
+  const showGullOmen = hasGullOmen && shipTime >= 345 && shipTime <= 360;
 
   const remainingSeconds = Math.max(0, Math.floor(CONFIG.TIMELINE - shipTime));
   const minutes = Math.floor(remainingSeconds / 60);
@@ -63,7 +70,7 @@ export const Hud: React.FC = () => {
         fontFamily: 'monospace',
       }}
     >
-      {/* Top Left: Loop Number & Countdown */}
+      {/* Top Left: Loop Number, Countdown & Inventory Strip */}
       <div
         style={{
           backgroundColor: 'rgba(7, 9, 15, 0.88)',
@@ -115,6 +122,111 @@ export const Hud: React.FC = () => {
             {timeFormatted}
           </span>
           <span style={{ fontSize: '12px', color: PALETTE.Ash }}>UNTIL SINKING</span>
+        </div>
+
+        {/* Flapping Gull Omen HUD Indicator (345s - 360s with K_OMEN_GULL) */}
+        {showGullOmen && (
+          <div
+            style={{
+              marginTop: '6px',
+              padding: '4px 8px',
+              backgroundColor: 'rgba(178, 58, 58, 0.22)',
+              border: `1px solid ${PALETTE.BloodRust}`,
+              borderRadius: '3px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+            title="The gull cries three times before the knives come (T-4:05)"
+          >
+            <span
+              style={{
+                display: 'inline-block',
+                fontSize: '14px',
+                animation: 'gullFlap 0.35s infinite alternate ease-in-out',
+              }}
+            >
+              🕊️
+            </span>
+            <span
+              style={{
+                fontSize: '11px',
+                color: PALETTE.BloodRust,
+                fontWeight: 'bold',
+                letterSpacing: '0.5px',
+              }}
+            >
+              GULL OMEN (T-4:05)
+            </span>
+            <style>
+              {`@keyframes gullFlap {
+                0% { transform: translateY(0px) scaleY(1); }
+                50% { transform: translateY(-2px) scaleY(0.75); }
+                100% { transform: translateY(1px) scaleY(1.1); }
+              }`}
+            </style>
+          </div>
+        )}
+
+        {/* Inventory Strip */}
+        <div
+          style={{
+            marginTop: '8px',
+            paddingTop: '8px',
+            borderTop: '1px solid rgba(229, 169, 59, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* Coin Counter */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '2px 6px',
+              backgroundColor: 'rgba(11, 19, 32, 0.9)',
+              border: `1px solid ${coins > 0 ? PALETTE.Lantern : '#223843'}`,
+              borderRadius: '3px',
+              fontSize: '11px',
+              color: coins > 0 ? PALETTE.Lantern : PALETTE.Ash,
+              fontWeight: 'bold',
+            }}
+            title={`${coins} Silver Coins`}
+          >
+            <span>🪙</span>
+            <span>{coins}</span>
+          </div>
+
+          {/* Item Pills */}
+          {inventory.map((item, idx) => (
+            <div
+              key={`${item}-${idx}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '2px 6px',
+                backgroundColor: 'rgba(11, 19, 32, 0.9)',
+                border: '1px solid #1a4253',
+                borderRadius: '3px',
+                fontSize: '10px',
+                color: PALETTE.Bone,
+              }}
+              title={item}
+            >
+              <span>{item.includes('Key') ? '🗝️' : item === 'Map' ? '🗺️' : '📦'}</span>
+              <span>{item}</span>
+            </div>
+          ))}
+
+          {inventory.length === 0 && coins === 0 && (
+            <span style={{ fontSize: '10px', color: PALETTE.Ash, fontStyle: 'italic' }}>
+              No carried items
+            </span>
+          )}
         </div>
       </div>
 

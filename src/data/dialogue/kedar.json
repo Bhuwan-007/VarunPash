@@ -66,13 +66,45 @@
       "journalNote": "Kedar cares only for the hold's locked gold. A purse might stay his blade."
     },
     {
-      "id": "kedar_navigator_hint",
-      "text": "Navigator, check the stars. The charts ended yesterday. We are sailing off the rim.",
+      "id": "kedar_role_navigator",
+      "text": "Ah, our esteemed Navigator. Keep us off the black reefs, friend. When new hands take the helm, there will be a generous share for a man of your skill.",
       "when": {
         "role": "navigator"
       },
-      "priority": 35,
-      "journalNote": "Kedar warned the Navigator that our course abandoned all known charts."
+      "priority": 45,
+      "journalNote": "Kedar spoke with smooth, measured politeness. He wants the Navigator alive to steer the ship after the mutiny."
+    },
+    {
+      "id": "kedar_role_quartermaster",
+      "text": "Keep your ledger shut and your nose out of the bilge, Quartermaster. Count your coins in silence and don't come sniffing around my business.",
+      "when": {
+        "role": "quartermaster"
+      },
+      "priority": 45,
+      "journalNote": "Kedar warned me away with cold suspicion. He watches the Quartermaster like a hawk."
+    },
+    {
+      "id": "kedar_role_deckhand",
+      "text": "...Out of my path, boy. A deckhand should be swabbing brine, not gaping at his betters.",
+      "when": {
+        "role": "deckhand"
+      },
+      "priority": 45,
+      "journalNote": "Kedar waved me away without looking up. To him, a deckhand is just grease on the deck."
+    },
+    {
+      "id": "kedar_react_mutineer",
+      "text": "You look at me like you know something.",
+      "requires": ["K_MUTINEER"],
+      "priority": 50,
+      "journalNote": "Kedar eyed me sharply, wondering how much I've pieced together."
+    },
+    {
+      "id": "kedar_react_safe_code",
+      "text": "The old man and his iron box... some fools think numbers will keep their throats dry.",
+      "requires": ["K_SAFE_CODE"],
+      "priority": 50,
+      "journalNote": "Kedar scoffed at the Captain's safe and locks."
     }
   ]
 }

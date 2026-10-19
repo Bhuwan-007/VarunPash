@@ -329,7 +329,10 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
               {(['navigator', 'quartermaster', 'deckhand'] as const).map((r) => (
                 <button
                   key={r}
-                  onClick={() => setPlayerRole(r)}
+                  onClick={() => {
+                    setPlayerRole(r);
+                    useLoopStore.getState().grantRoleStartingInventory();
+                  }}
                   style={{
                     flex: 1,
                     padding: '4px',
@@ -373,6 +376,81 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* P6 Puzzle Shortcuts (Requirement 9) */}
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '11px', color: PALETTE.Ash, marginBottom: '6px' }}>P6 PUZZLE SHORTCUTS:</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+              <button
+                onClick={() => {
+                  useLoopStore.getState().addItem('Silver Locket');
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: PALETTE.Deepwater,
+                  color: PALETTE.Bone,
+                  border: '1px solid #1a4253',
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                + Give Locket
+              </button>
+              <button
+                onClick={() => {
+                  useLoopStore.getState().addItem('Helm Key');
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: PALETTE.Deepwater,
+                  color: PALETTE.Bone,
+                  border: '1px solid #1a4253',
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                + Give Helm Key
+              </button>
+              <button
+                onClick={() => {
+                  const loopStore = useLoopStore.getState();
+                  loopStore.openStrongbox();
+                  loopStore.addItem('Helm Key');
+                  loopStore.addItem('Armory Key');
+                  addKnowledge('CLUE_LOCKET_STRONGBOX');
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: PALETTE.Deepwater,
+                  color: PALETTE.Lantern,
+                  border: `1px solid ${PALETTE.Lantern}`,
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                🔓 Open Strongbox
+              </button>
+              <button
+                onClick={() => {
+                  setShipTime(355);
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: PALETTE.Deepwater,
+                  color: PALETTE.BloodRust,
+                  border: `1px solid ${PALETTE.BloodRust}`,
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                ⏩ Jump to 355s
+              </button>
             </div>
           </div>
 

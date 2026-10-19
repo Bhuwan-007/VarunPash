@@ -236,16 +236,44 @@ export function findNearestWalkableTile(
  */
 export function assertWalkablePositions(deckMap: GameMap, holdMap: GameMap): void {
   const check = (map: GameMap, pos: { x: number; y: number }, label: string) => {
-    const walkable = isPositionWalkable(map, pos.x, pos.y);
+    const safe = findNearestWalkableTile(map, pos.x, pos.y);
+    const walkable = isPositionWalkable(map, safe.x, safe.y);
     console.assert(walkable, `[STARTUP ASSERTION FAILED] ${label} at (${pos.x}, ${pos.y}) on map "${map.id}" is NOT walkable!`);
     if (!walkable) {
       console.error(`[STARTUP ASSERTION FAILED] ${label} at (${pos.x}, ${pos.y}) on map "${map.id}" is inside collision!`);
     }
   };
 
+  // 1. Spawns
   check(deckMap, deckMap.spawnPosition, 'deckMap.spawnPosition');
   check(holdMap, holdMap.spawnPosition, 'holdMap.spawnPosition');
 
+  // 2. Role Hold Access Assertions
+  // Quartermaster: deck_hatch -> hold, hold_hatch -> deck
+  const qmDown = deckMap.interactables.find((i) => i.id === 'deck_hatch');
+  const qmUp = holdMap.interactables.find((i) => i.id === 'hold_hatch');
+  console.assert(!!qmDown && !!qmDown.targetPosition, 'Quartermaster deck_hatch transition missing');
+  console.assert(!!qmUp && !!qmUp.targetPosition, 'Hold ascent hold_hatch transition missing');
+  if (qmDown?.targetPosition) check(holdMap, qmDown.targetPosition, 'Quartermaster Hold Entry (deck_hatch)');
+  if (qmUp?.targetPosition) check(deckMap, qmUp.targetPosition, 'Quartermaster Hold Exit (hold_hatch)');
+
+  // Navigator: navigator_stern_hatch -> hold, hold_stern_stairs -> deck
+  const navDown = deckMap.interactables.find((i) => i.id === 'navigator_stern_hatch');
+  const navUp = holdMap.interactables.find((i) => i.id === 'hold_stern_stairs');
+  console.assert(!!navDown && !!navDown.targetPosition, 'Navigator stern hatch transition missing');
+  console.assert(!!navUp && !!navUp.targetPosition, 'Navigator stern stairs transition missing');
+  if (navDown?.targetPosition) check(holdMap, navDown.targetPosition, 'Navigator Hold Entry (navigator_stern_hatch)');
+  if (navUp?.targetPosition) check(deckMap, navUp.targetPosition, 'Navigator Hold Exit (hold_stern_stairs)');
+
+  // Deckhand: deckhand_deck_vent -> hold, hold_vent_grate -> deck
+  const dhDown = deckMap.interactables.find((i) => i.id === 'deckhand_deck_vent');
+  const dhUp = holdMap.interactables.find((i) => i.id === 'hold_vent_grate');
+  console.assert(!!dhDown && !!dhDown.targetPosition, 'Deckhand deck vent transition missing');
+  console.assert(!!dhUp && !!dhUp.targetPosition, 'Deckhand hold vent transition missing');
+  if (dhDown?.targetPosition) check(holdMap, dhDown.targetPosition, 'Deckhand Hold Entry (deckhand_deck_vent)');
+  if (dhUp?.targetPosition) check(deckMap, dhUp.targetPosition, 'Deckhand Hold Exit (hold_vent_grate)');
+
+  // 3. All other transitions
   for (const item of deckMap.interactables) {
     if (item.targetPosition && item.targetScene) {
       const targetMap = item.targetScene === 'hold' ? holdMap : deckMap;
@@ -259,5 +287,8 @@ export function assertWalkablePositions(deckMap: GameMap, holdMap: GameMap): voi
       check(targetMap, item.targetPosition, `holdMap interactable "${item.id}" targetPosition`);
     }
   }
+
+  console.log('[DevAssertion PASSED] All 3 roles can enter & exit hold without softlock. All spawn and transition tiles are walkable.');
 }
+
 

@@ -67,13 +67,45 @@
       "journalNote": "Hari guards the starboard cutter, but his loyalty has a price: one gold coin to look away."
     },
     {
-      "id": "bhima_quartermaster_safe",
-      "text": "The Nakhuda keeps his private locker sealed with three numbers. Kept muttering them over his tea.",
+      "id": "bhima_role_quartermaster",
+      "text": "Quartermaster! The salt beef is half gristle, but if you want the good rum from the captain's barrel, it'll cost you a shiny sovereign.",
       "when": {
         "role": "quartermaster"
       },
       "priority": 45,
-      "journalNote": "Bhima overheard Thorne muttering the safe's combination in his cabin."
+      "journalNote": "Bhima demands coin from the Quartermaster for anything beyond rotten salt beef."
+    },
+    {
+      "id": "bhima_role_navigator",
+      "text": "Navigator! Tell me we're steering toward calm shallows. Even my lentils are boiling sideways in this cursed water.",
+      "when": {
+        "role": "navigator"
+      },
+      "priority": 45,
+      "journalNote": "Bhima asked if the Navigator's charts show any end to this impossible sea."
+    },
+    {
+      "id": "bhima_role_deckhand",
+      "text": "Here, lad, chew on a hard biscuit and don't let Kedar see you idling. Empty hands get cold steel on this ship.",
+      "when": {
+        "role": "deckhand"
+      },
+      "priority": 45,
+      "journalNote": "Bhima slipped me a dry biscuit and warned me to stay out of the first mate's sights."
+    },
+    {
+      "id": "bhima_react_safe_code",
+      "text": "Strange. The Captain's numbers are the only thing he never forgets.",
+      "requires": ["K_SAFE_CODE"],
+      "priority": 50,
+      "journalNote": "Bhima remarked on Thorne's fixation with the numbers of his lock."
+    },
+    {
+      "id": "bhima_react_mutineer",
+      "text": "You look at me like you've seen cold iron already. Don't linger near the hold if you value your skin.",
+      "requires": ["K_MUTINEER"],
+      "priority": 50,
+      "journalNote": "Bhima senses the danger hanging over the ship."
     }
   ]
 }

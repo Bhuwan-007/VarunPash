@@ -26,6 +26,8 @@ export interface UIState {
   activeDialogue: ActiveDialogueSession | null;
   interactionIgnoreTimer: number;
   hasDismissedControlsHint: boolean;
+  roleCardOpen: boolean;
+  strongboxKeypadOpen: boolean;
 
   // Actions
   setGameScreen: (screen: 'title' | 'intro' | 'game') => void;
@@ -41,6 +43,10 @@ export interface UIState {
   closeDialogue: () => void;
   setInteractionIgnoreTimer: (duration: number) => void;
   dismissControlsHint: () => void;
+  openRoleCard: () => void;
+  closeRoleCard: () => void;
+  openStrongboxKeypad: () => void;
+  closeStrongboxKeypad: () => void;
 }
 
 let pulseTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -55,9 +61,31 @@ export const useUIStore = create<UIState>((set, get) => ({
   activeDialogue: null,
   interactionIgnoreTimer: 0,
   hasDismissedControlsHint: false,
+  roleCardOpen: false,
+  strongboxKeypadOpen: false,
 
   setGameScreen: (screen) => set({ gameScreen: screen }),
   dismissControlsHint: () => set({ hasDismissedControlsHint: true }),
+  openRoleCard: () => {
+    useLoopStore.getState().setPaused(true);
+    set({ roleCardOpen: true });
+  },
+  closeRoleCard: () => {
+    set({ roleCardOpen: false, interactionIgnoreTimer: 0.3 });
+    if (!get().journalOpen && !get().activeDialogue) {
+      useLoopStore.getState().setPaused(false);
+    }
+  },
+  openStrongboxKeypad: () => {
+    useLoopStore.getState().setPaused(true);
+    set({ strongboxKeypadOpen: true });
+  },
+  closeStrongboxKeypad: () => {
+    set({ strongboxKeypadOpen: false, interactionIgnoreTimer: 0.3 });
+    if (!get().journalOpen && !get().activeDialogue && !get().roleCardOpen) {
+      useLoopStore.getState().setPaused(false);
+    }
+  },
 
   showDeathToast: (data) => {
     set({

@@ -16,13 +16,21 @@ import { playKnowledgeBell } from '../../utils/audio';
  *   - Plays a soft resonant ship bell chime via Web Audio API.
  *   - Triggers Tide Glow pulse on HUD journal icon.
  */
-export function addKnowledge(flag: string): boolean {
+export function addKnowledge(
+  flag: string,
+  customEntry?: {
+    id: string;
+    tab: string;
+    title: string;
+    text: string;
+  }
+): boolean {
   const memoryStore = useMemoryStore.getState();
   if (memoryStore.knowledge.includes(flag)) {
     return false;
   }
 
-  const entryDef = JOURNAL_ENTRIES[flag];
+  const entryDef = customEntry ?? JOURNAL_ENTRIES[flag];
   const loopNumber = memoryStore.deathCount + 1;
   const journalEntry = entryDef
     ? {
@@ -30,8 +38,8 @@ export function addKnowledge(flag: string): boolean {
         tab: entryDef.tab,
         title: entryDef.title,
         text: entryDef.text,
-        code: entryDef.code,
-        tideTime: entryDef.tideTime,
+        code: (entryDef as any).code,
+        tideTime: (entryDef as any).tideTime,
         loop: loopNumber,
       }
     : undefined;

@@ -65,6 +65,47 @@
       "priority": 22,
       "grants": ["CLUE_LOCKET"],
       "journalNote": "Hari saw a silver locket dropped near the capstan. Refused to touch it for fear of ill luck."
+    },
+    {
+      "id": "hari_role_quartermaster",
+      "text": "Quartermaster. Your keys can open any locker, but only cold silver unlocks these lifeboat davits. Remember who holds the falls.",
+      "when": {
+        "role": "quartermaster"
+      },
+      "priority": 45,
+      "journalNote": "Hari eyed my belt with greedy respect. Coin is the only language he listens to."
+    },
+    {
+      "id": "hari_role_navigator",
+      "text": "Charts won't float when the timbers crack, Navigator. Point us toward dry land, or we'll all be feeding the bottom.",
+      "when": {
+        "role": "navigator"
+      },
+      "priority": 45,
+      "journalNote": "Hari grumbled at the Navigator, anxious for charts that lead to solid ground."
+    },
+    {
+      "id": "hari_role_deckhand",
+      "text": "Move along, deckhand. Lifeboats are for men who pull their weight. You go over the side with the rats.",
+      "when": {
+        "role": "deckhand"
+      },
+      "priority": 45,
+      "journalNote": "Hari shoved me aside. He treats deckhands as expendable ballast."
+    },
+    {
+      "id": "hari_react_mutineer",
+      "text": "Keep quiet and look to your own business. The wind is shifting, and words can get a throat cut.",
+      "requires": ["K_MUTINEER"],
+      "priority": 50,
+      "journalNote": "Hari warns me that the tension on deck is ready to boil over."
+    },
+    {
+      "id": "hari_react_omen_gull",
+      "text": "You heard that bird on the spar too, eh? Three cries means nobody gets an easy night on the Jal-Doot.",
+      "requires": ["K_OMEN_GULL"],
+      "priority": 50,
+      "journalNote": "Hari recognized the three cries of the gull as an omen of ill fortune."
     }
   ]
 }

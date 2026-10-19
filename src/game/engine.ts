@@ -46,6 +46,10 @@ export interface ReadonlyGameState {
   readonly mutineers: readonly MutineerSilhouette[];
   readonly eventStatus: EventStatus;
   readonly barks: readonly ActiveBark[];
+  readonly playerRole: 'navigator' | 'quartermaster' | 'deckhand';
+  readonly dangerHoldProgress: number;
+  readonly dangerTargetId: string | null;
+  readonly hasPickedDeckLocket: boolean;
 }
 
 export class GameEngine {
@@ -68,6 +72,11 @@ export class GameEngine {
   private transitionCooldown: number = 0;
   private inkFadeTimer: number = 0;
   private readonly INK_FADE_DURATION: number = 0.4;
+
+  private eavesdropHoldTimer: number = 0;
+  private dangerHoldTimer: number = 0;
+  private dangerTargetId: string | null = null;
+  private navigatorKnockIndex: number = 0;
 
   private activeBarks: ActiveBark[] = [];
   private triggeredBarkEvents: Set<string> = new Set();
@@ -120,6 +129,8 @@ export class GameEngine {
         this.transitionCooldown = 0.4;
         this.inkFadeTimer = this.INK_FADE_DURATION;
         this.previousShipTime = useLoopStore.getState().shipTime;
+        this.dangerHoldTimer = 0;
+        this.dangerTargetId = null;
         this.eventScheduler.reset();
 
         this.camera.update(
@@ -295,14 +306,89 @@ export class GameEngine {
     // 7. Proximity check for interactables (Static props + Live NPCs)
     let closest: Interactable | null = null;
     let minDistance = Infinity;
+    const playerRole = useMemoryStore.getState().playerRole ?? 'deckhand';
+
+    const hasChant = useMemoryStore.getState().knowledge.includes('K_CHANT');
+    const hasPickedLocket = useLoopStore.getState().hasPickedDeckLocketThisLoop;
 
     for (const item of activeMap.interactables) {
+      // Role filtering for secret entrances/vents
+      if (item.id === 'navigator_stern_hatch' && playerRole !== 'navigator') {
+        continue;
+      }
+      if (item.id === 'deckhand_deck_vent' && playerRole !== 'deckhand') {
+        continue;
+      }
+      // Skip deck locket if already picked this loop
+      if (item.id === 'deck_locket' && hasPickedLocket) {
+        continue;
+      }
+
       const centerX = item.x + (item.width ?? 1) / 2;
       const centerY = item.y + (item.height ?? 1) / 2;
       const dist = Math.hypot(this.player.x - centerX, this.player.y - centerY);
 
       if (dist <= CONFIG.INTERACT_RADIUS && dist < minDistance) {
-        closest = item;
+        // Dynamic labels based on role and shipTime
+        let label = item.label;
+        if (item.id === 'captain_door') {
+          if (playerRole === 'navigator') {
+            label = "Knock on Captain's Door";
+          } else if (shipTime >= 360) {
+            label = "Examine Nakhuda's Cabin Door (Ajar)";
+          } else if (shipTime >= 240 && shipTime <= 270) {
+            label = "Enter Nakhuda's Cabin (Unlocked)";
+          } else {
+            label = "Force Cabin Door (Hold E 1s - Danger)";
+          }
+        } else if (item.id === 'relic_kaal_mani') {
+          label = hasChant ? 'Examine the Kaal Mani' : 'Touch the Kaal Mani (Hold E 1s - Danger)';
+        } else if (item.id === 'quarterdeck_strongbox') {
+          const loopStore = useLoopStore.getState();
+          if (loopStore.strongboxJammed) {
+            label = 'Strongbox (Mechanism Jammed)';
+          } else if (loopStore.strongboxOpened) {
+            label = 'Strongbox (Open)';
+          } else {
+            label = 'Strongbox (3-digit lock)';
+          }
+        } else if (item.id === 'statue_figure') {
+          const memory = useMemoryStore.getState();
+          const loop = useLoopStore.getState();
+          if (memory.knowledge.includes('K_CHANT') && memory.knowledge.includes('K_LOCKET_TWIN')) {
+            label = 'Examine Statue Base (Glyphs)';
+          } else if (memory.knowledge.includes('K_CHANT') && loop.inventory.includes('Silver Locket')) {
+            label = 'Examine Statue (Compare Locket)';
+          } else {
+            label = 'Examine Petrified Statue';
+          }
+        } else if (item.id === 'deck_hatch') {
+          label = useLoopStore.getState().inventory.includes('Hold Key')
+            ? 'Unlock & Enter Cargo Hold (Descend Stairs)'
+            : 'Enter Cargo Hold (Locked)';
+        } else if (item.id === 'hold_stern_stairs') {
+          label =
+            playerRole === 'navigator'
+              ? 'Ascend Stern Companionway to Deck'
+              : "Navigator's Stern Companionway (Chained & Padlocked)";
+        } else if (item.id === 'hold_vent_grate') {
+          label =
+            playerRole === 'deckhand'
+              ? 'Crawl through vent to Quarterdeck'
+              : 'Ventilation Grate';
+        } else if (item.id === 'hold_eavesdrop_vent') {
+          if (playerRole === 'deckhand') {
+            if (shipTime >= 310 && shipTime <= 335) {
+              label = 'Hold [E] to Listen (Eavesdrop on Mutineers)';
+            } else {
+              label = 'Listening Grate (Silence from beyond the grate)';
+            }
+          } else {
+            label = 'Ventilation Grate';
+          }
+        }
+
+        closest = { ...item, label };
         minDistance = dist;
       }
     }
@@ -327,6 +413,88 @@ export class GameEngine {
       }
     }
     this.activeInteractable = closest;
+
+    // 7b. Danger Confirmation Hold Check (Hold E for 1.0 second, releasing cancels)
+    const isDangerousCabinDoor =
+      this.activeInteractable?.id === 'captain_door' &&
+      playerRole !== 'navigator' &&
+      (shipTime < 240 || (shipTime > 270 && shipTime < 360));
+
+    const isDangerousRelic =
+      this.activeInteractable?.id === 'relic_kaal_mani' &&
+      !hasChant;
+
+    const isDangerAction = isDangerousCabinDoor || isDangerousRelic;
+
+    if (isDangerAction && this.input.isActionPressed('interact')) {
+      this.dangerHoldTimer += dt;
+      this.dangerTargetId = this.activeInteractable?.id ?? null;
+
+      if (this.dangerHoldTimer >= 1.0) {
+        this.dangerHoldTimer = 0;
+        this.dangerTargetId = null;
+
+        if (isDangerousCabinDoor) {
+          playGunshot();
+          this.screenShake.trigger(14, 0.8);
+          addKnowledge('K_SAFE_CODE');
+          this.loopManager.handleDeath('shot by Nakhuda');
+          return;
+        } else if (isDangerousRelic) {
+          this.screenShake.trigger(15, 1.2);
+          addKnowledge('K_CHANT');
+          this.loopManager.handleDeath('vaporized by Kaal Mani');
+          return;
+        }
+      }
+    } else {
+      this.dangerHoldTimer = 0;
+      this.dangerTargetId = null;
+    }
+
+    // 7c. Continuous Deckhand Eavesdropping timer (Hold E for 3 seconds between 310 and 335s)
+    const isEavesdroppingSpot =
+      playerRole === 'deckhand' &&
+      this.scene === 'hold' &&
+      shipTime >= 310 &&
+      shipTime <= 335 &&
+      this.activeInteractable?.id === 'hold_eavesdrop_vent';
+
+    if (isEavesdroppingSpot && this.input.isActionPressed('interact')) {
+      this.eavesdropHoldTimer += dt;
+      const remaining = Math.max(0, 3.0 - this.eavesdropHoldTimer);
+      this.messageBanner = `Listening to mutineers... (${remaining.toFixed(1)}s)`;
+      this.messageTimer = 0.3;
+
+      if (this.eavesdropHoldTimer >= 3.0) {
+        this.eavesdropHoldTimer = 0;
+        addKnowledge('K_MUTINEER', {
+          id: 'clue_deckhand_eavesdrop',
+          tab: 'Clues',
+          title: 'Mutiny in the Hold',
+          text: 'Pressed against the iron grate, I heard Kedar whispering with his cutthroats. The mutiny is set for the sixth bell (360s). They plan to strike Thorne down in his quarters.',
+        });
+        this.messageBanner = "Overheard Kedar's plot: Mutiny set for 360s!";
+        this.messageTimer = 4.0;
+      }
+    } else {
+      this.eavesdropHoldTimer = 0;
+    }
+
+    // 7d. Gull Omen & Tide Table event observations
+    if (this.scene === 'deck' && shipTime >= 355 && shipTime < 360) {
+      const currentLoop = useMemoryStore.getState().deathCount + 1;
+      useMemoryStore.getState().recordGullSighting(currentLoop);
+    }
+    if (this.scene === 'deck' && shipTime >= 240 && shipTime <= 270) {
+      addKnowledge('TIDE_NAKHUDA_HELM');
+    }
+    if (shipTime >= 360 && shipTime <= 366) {
+      addKnowledge('K_MUTINEER');
+    }
+    if (shipTime >= 480 && shipTime <= 490) {
+      addKnowledge('K_Makara_WEAKNESS');
+    }
 
     // 8. Interaction action [E]
     if (this.transitionCooldown > 0) {
@@ -376,26 +544,115 @@ export class GameEngine {
   }
 
   private triggerInteraction(interactable: Interactable, shipTime: number): void {
-    // 1. Force the cabin door (Nakhuda shoots through the barred door)
+    const playerRole = useMemoryStore.getState().playerRole ?? 'deckhand';
+
+    // 1. Captain's cabin door
     if (interactable.id === 'captain_door') {
-      if (shipTime < 240 || shipTime > 270) {
-        playGunshot();
-        this.screenShake.trigger(14, 0.8);
-        addKnowledge('K_SAFE_CODE');
-        this.loopManager.handleDeath('shot by Nakhuda');
+      if (playerRole === 'navigator') {
+        if (this.navigatorKnockIndex === 0) {
+          this.messageBanner = "Thorne (through door): 'Is that you, Navigator? Keep to your charts! The compass is dead, but the wheel must hold!'";
+          this.navigatorKnockIndex = 1;
+        } else {
+          this.messageBanner = "Thorne (through door): 'Do not touch the cargo below! Whatever is humming in the hold, it hungers!'";
+          this.navigatorKnockIndex = 0;
+        }
+        this.messageTimer = 4.0;
         return;
-      } else {
+      }
+
+      if (shipTime >= 360) {
+        // Nakhuda was killed in the mutiny outside; door is ajar, no danger!
+        this.messageBanner = "The door is ajar; Nakhuda lies fallen on the quarterdeck.";
+        this.messageTimer = 3.0;
+        return;
+      }
+
+      if (shipTime >= 240 && shipTime <= 270) {
         this.messageBanner = 'The cabin door stands unlocked; Nakhuda is at the helm.';
         this.messageTimer = 2.5;
         return;
       }
+
+      // Non-Navigator while Nakhuda is alive inside requires 1.0s danger hold
+      this.messageBanner = 'Hold [E] for 1 second to force the barricaded door.';
+      this.messageTimer = 2.0;
+      return;
     }
 
-    // 2. Touch the Kaal Mani in the cargo hold
+    // 2. Kaal Mani in cargo hold
     if (interactable.id === 'relic_kaal_mani') {
-      this.screenShake.trigger(15, 1.2);
-      addKnowledge('K_CHANT');
-      this.loopManager.handleDeath('vaporized by Kaal Mani');
+      const memory = useMemoryStore.getState();
+      if (memory.knowledge.includes('K_CHANT')) {
+        this.messageBanner = 'The Kaal Mani pulses cold against your palm. The chant shields you from its dark hum.';
+        this.messageTimer = 3.5;
+        return;
+      }
+      // Without K_CHANT, touching is deadly and requires 1.0s danger hold
+      this.messageBanner = 'Hold [E] for 1 second to touch the humming relic.';
+      this.messageTimer = 2.0;
+      return;
+    }
+
+    // 2b. Strongbox on Quarterdeck (3-digit lock)
+    if (interactable.id === 'quarterdeck_strongbox') {
+      const loopStore = useLoopStore.getState();
+      if (loopStore.strongboxJammed) {
+        this.messageBanner = 'The lock mechanism is jammed for this loop.';
+        this.messageTimer = 3.0;
+        return;
+      }
+      if (loopStore.strongboxOpened) {
+        this.messageBanner = 'The strongbox stands open. Both keys have been taken.';
+        this.messageTimer = 3.0;
+        return;
+      }
+      useUIStore.getState().openStrongboxKeypad();
+      return;
+    }
+
+    // 2c. Silver Locket on Main Deck near Hatch
+    if (interactable.id === 'deck_locket') {
+      const loopStore = useLoopStore.getState();
+      if (loopStore.hasPickedDeckLocketThisLoop) {
+        return;
+      }
+      loopStore.pickDeckLocket();
+      const memory = useMemoryStore.getState();
+      if (!memory.knowledge.includes('CLUE_LOCKET_DECK')) {
+        addKnowledge('CLUE_LOCKET_DECK');
+      }
+      this.messageBanner = "Picked up Silver Locket: 'Return to the start.'";
+      this.messageTimer = 3.0;
+      return;
+    }
+
+    // 2d. Petrified Statue in Cargo Hold
+    if (interactable.id === 'statue_figure') {
+      if (typeof (window as any).triggerMoment === 'function') {
+        (window as any).triggerMoment('statue');
+      }
+      const memory = useMemoryStore.getState();
+      const loop = useLoopStore.getState();
+      const hasChant = memory.knowledge.includes('K_CHANT');
+      const carriesLocket = loop.inventory.includes('Silver Locket');
+      const hasLocketTwin = memory.knowledge.includes('K_LOCKET_TWIN');
+
+      if (hasChant && hasLocketTwin) {
+        addKnowledge('K_STATUE_TRUTH');
+        this.messageBanner = 'Glyphs on the base: speak it from above, never from the deep.';
+        this.messageTimer = 4.0;
+        return;
+      }
+
+      if (hasChant && carriesLocket) {
+        addKnowledge('K_LOCKET_TWIN');
+        this.messageBanner = "The statue's locket matches mine. The engraving is the same.";
+        this.messageTimer = 4.0;
+        return;
+      }
+
+      this.messageBanner = 'A stone figure, hand clasped around a locket. The face is turned away.';
+      this.messageTimer = 3.5;
       return;
     }
 
@@ -403,8 +660,27 @@ export class GameEngine {
     if (interactable.id.startsWith('npc_')) {
       const npcId = interactable.id.replace('npc_', '');
 
+      // Quartermaster: Bhima and Hari ask for 1 coin on first conversation of each loop
+      if (playerRole === 'quartermaster' && (npcId === 'bhima' || npcId === 'hari')) {
+        const loopStore = useLoopStore.getState();
+        if (!loopStore.chargedNpcsThisLoop.includes(npcId)) {
+          if (loopStore.coins >= 1) {
+            loopStore.spendCoins(1);
+            loopStore.recordChargedNpc(npcId);
+            this.messageBanner = `Paid 1 coin to ${npcId === 'bhima' ? 'Bhima' : 'Hari'}. (${loopStore.coins - 1} coins remaining)`;
+            this.messageTimer = 2.5;
+          } else {
+            this.messageBanner = 'No coin, no word.';
+            this.messageTimer = 3.0;
+            return; // Refuse dialogue
+          }
+        }
+      }
+
       // Kedar at or after 360: stabs player
       if (npcId === 'kedar' && shipTime >= 360) {
+        const started = useUIStore.getState().startDialogue('kedar');
+        if (started) return;
         addKnowledge('K_MUTINEER');
         playKnifeStab();
         this.screenShake.trigger(12, 0.5);
@@ -418,23 +694,48 @@ export class GameEngine {
         return;
       }
 
-      // Kedar at or after 360: dialogue takes precedence when interacting with E
-      if (npcId === 'kedar' && shipTime >= 360) {
-        const started = useUIStore.getState().startDialogue('kedar');
-        if (started) return;
-        addKnowledge('K_MUTINEER');
-        playKnifeStab();
-        this.screenShake.trigger(12, 0.5);
-        this.loopManager.handleDeath('stabbed by Kedar');
-        return;
-      }
-
       const started = useUIStore.getState().startDialogue(npcId);
       if (started) return;
     }
 
-    // 4. Scene Transition (Hatch Stairs)
-    if (interactable.type === 'hatch' && interactable.targetScene && interactable.targetPosition) {
+    // 4. Main deck hatch (needs Hold Key from deck side)
+    if (interactable.id === 'deck_hatch') {
+      const hasHoldKey = useLoopStore.getState().inventory.includes('Hold Key');
+      if (!hasHoldKey) {
+        this.messageBanner = "Locked. A key hangs on the Quartermaster's belt.";
+        this.messageTimer = 3.0;
+        return;
+      }
+    }
+
+    // 5. Hold stern companionway (unlocked only for Navigator)
+    if (interactable.id === 'hold_stern_stairs' && playerRole !== 'navigator') {
+      this.messageBanner = 'Chained and padlocked from above.';
+      this.messageTimer = 3.0;
+      return;
+    }
+
+    // 6. Hold vent grate (only Deckhand can crawl through)
+    if (interactable.id === 'hold_vent_grate' && playerRole !== 'deckhand') {
+      this.messageBanner = 'A narrow iron ventilation grate. Too tight to squeeze through.';
+      this.messageTimer = 3.0;
+      return;
+    }
+
+    // 7. Eavesdrop vent inspection hint
+    if (interactable.id === 'hold_eavesdrop_vent') {
+      if (playerRole === 'deckhand' && shipTime >= 310 && shipTime <= 335) {
+        this.messageBanner = 'Hold [E] for 3 seconds to eavesdrop on the mutineers.';
+        this.messageTimer = 2.5;
+        return;
+      }
+      this.messageBanner = 'Silence from beyond the grate.';
+      this.messageTimer = 2.5;
+      return;
+    }
+
+    // 8. Scene Transitions (Hatch, Vents, Companionways)
+    if (interactable.targetScene && interactable.targetPosition) {
       this.scene = interactable.targetScene;
       useLoopStore.getState().setScene(this.scene);
 
@@ -538,6 +839,10 @@ export class GameEngine {
       mutineers,
       eventStatus,
       barks: this.activeBarks,
+      playerRole: useMemoryStore.getState().playerRole ?? 'deckhand',
+      dangerHoldProgress: Math.min(1.0, this.dangerHoldTimer / 1.0),
+      dangerTargetId: this.dangerTargetId,
+      hasPickedDeckLocket: useLoopStore.getState().hasPickedDeckLocketThisLoop,
     };
   }
 }

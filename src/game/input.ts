@@ -59,6 +59,13 @@ export class InputManager {
     return pressed;
   }
 
+  public isActionPressed(action: 'interact'): boolean {
+    if (action === 'interact') {
+      return this.isKeyDown('e');
+    }
+    return false;
+  }
+
   /**
    * Reset single-frame action states. Called at the end of each game update tick.
    */

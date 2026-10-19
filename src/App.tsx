@@ -9,6 +9,8 @@ import { DialogueBox } from './ui/DialogueBox';
 import { Hud } from './ui/Hud';
 import { IntroCutscene } from './ui/IntroCutscene';
 import { Journal } from './ui/Journal';
+import { RoleCard } from './ui/RoleCard';
+import { StrongboxKeypad } from './ui/StrongboxKeypad';
 import { TitleScreen } from './ui/TitleScreen';
 import { useUIStore } from './store/uiStore';
 
@@ -126,6 +128,12 @@ export const App: React.FC = () => {
 
         {/* Text-only Opening Cutscene Overlay */}
         {gameScreen === 'intro' && <IntroCutscene />}
+
+        {/* One-time Role Card Modal */}
+        <RoleCard />
+
+        {/* Strongbox 3-Digit Keypad Overlay */}
+        <StrongboxKeypad />
 
         {/* Dev Debug Panel - Only present during development, stripped in itch.io production build */}
         {import.meta.env.DEV && (

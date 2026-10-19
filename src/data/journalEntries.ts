@@ -57,25 +57,34 @@ export const JOURNAL_ENTRIES: Record<string, JournalEntryDef> = {
   K_LOCKET_TWIN: {
     id: 'entry_locket_twin',
     flag: 'K_LOCKET_TWIN',
-    tab: 'People',
-    title: 'The Stone Hand',
-    text: 'The statue in the hold clutches a brass locket—the exact twin of the one on the deck. And it wears my own sash in stone.',
+    tab: 'Clues',
+    title: 'The Twin Locket',
+    text: "The statue's locket matches mine. The engraving is the same.",
   },
   K_STATUE_TRUTH: {
     id: 'entry_statue_truth',
     flag: 'K_STATUE_TRUTH',
     tab: 'Clues',
     title: 'Voice from Above',
-    text: "Carved into the statue's base: 'It speaks from above, never from the deep.' The chant must be read through the upper listening grate, not beside the relic.",
+    text: 'Glyphs on the base: speak it from above, never from the deep.',
   },
   K_OMEN_GULL: {
     id: 'entry_omen_gull',
     flag: 'K_OMEN_GULL',
     tab: 'Tide Table',
-    title: 'Three Cries of the Gull',
-    text: 'At T-4:05 (355s), a gull cries thrice from the main mast. Exactly five seconds before the knives are drawn.',
+    title: 'The Gull Omen',
+    text: 'The gull cries three times before the knives come.',
     tideTime: 'T-4:05 (355s)',
     tideSeconds: 355,
+  },
+  TIDE_NAKHUDA_HELM: {
+    id: 'entry_tide_nakhuda_helm',
+    flag: 'TIDE_NAKHUDA_HELM',
+    tab: 'Tide Table',
+    title: "Nakhuda at the Helm",
+    text: 'At T-6:00 (240s-270s), Nakhuda Thorne steps out from his cabin to the helm. The only time he leaves his barricade.',
+    tideTime: 'T-6:00 (240s)',
+    tideSeconds: 240,
   },
   K_BHIMA_GOSSIP: {
     id: 'entry_bhima_gossip',
@@ -133,6 +142,20 @@ export const JOURNAL_ENTRIES: Record<string, JournalEntryDef> = {
     title: 'The Tarnished Locket',
     text: "A brass locket dropped upon the deck planks. It bears the same tide-knot carving as the stone statue below.",
   },
+  CLUE_LOCKET_DECK: {
+    id: 'entry_clue_locket_deck',
+    flag: 'CLUE_LOCKET_DECK',
+    tab: 'Clues',
+    title: 'Silver Locket on Deck',
+    text: "A silver locket on the deck. Engraved: 'Return to the start.'",
+  },
+  CLUE_LOCKET_STRONGBOX: {
+    id: 'entry_clue_locket_strongbox',
+    flag: 'CLUE_LOCKET_STRONGBOX',
+    tab: 'Clues',
+    title: 'A Second Locket',
+    text: 'A second locket in the strongbox, engraved the same as the one on the deck. Both cannot be real.',
+  },
 };
 
 export const INITIAL_CLUES_ENTRY: JournalEntryDef = {
@@ -177,4 +200,69 @@ export const NPC_PROFILE_CARDS: Record<string, { id: string; name: string; role:
     description: 'Massive, bald, and anchor-tattooed. Guards the starboard lifeboats; coin is his only loyalty.',
   },
 };
+
+export interface RoleCardInfo {
+  role: 'navigator' | 'quartermaster' | 'deckhand';
+  title: string;
+  carry: string;
+  holdAccess: string;
+  crewTreatment: string;
+  sashColor: string;
+  sashColorName: string;
+  journalEntry: {
+    id: string;
+    tab: 'Clues';
+    title: string;
+    text: string;
+  };
+}
+
+export const ROLE_CARDS: Record<'navigator' | 'quartermaster' | 'deckhand', RoleCardInfo> = {
+  navigator: {
+    role: 'navigator',
+    title: 'Navigator',
+    carry: 'Sea Chart (Map)',
+    holdAccess: 'Hidden stern hatch near the helm (marked on your Map) leading to the stern companionway.',
+    crewTreatment: 'The crew treat you with polite courtesy; Nakhuda answers through his barred cabin door.',
+    sashColor: '#2e6f9e',
+    sashColorName: 'Deepwater Blue',
+    journalEntry: {
+      id: 'clue_role_navigator',
+      tab: 'Clues',
+      title: "Navigator's Bearing",
+      text: "I carry the sea chart that ends where this voyage began. A secret hatch near the helm opens down to the stern hold. Nakhuda may heed my knock, and Kedar speaks with wary politeness.",
+    },
+  },
+  quartermaster: {
+    role: 'quartermaster',
+    title: 'Quartermaster',
+    carry: 'Hold Key, Armory Key, 6 Silver Coins',
+    holdAccess: 'Main deck cargo hatch (unlocked with your Hold Key).',
+    crewTreatment: 'The crew are mercenary and watchful; Bhima and Hari demand 1 coin before speaking.',
+    sashColor: '#b23a3a',
+    sashColorName: 'Blood Rust Red',
+    journalEntry: {
+      id: 'clue_role_quartermaster',
+      tab: 'Clues',
+      title: "Quartermaster's Keys",
+      text: "The Hold Key and Armory Key hang at my belt with six silver coins. The main cargo hatch opens to my key. Bhima and Hari know my pockets are lined—they demand coin before speaking.",
+    },
+  },
+  deckhand: {
+    role: 'deckhand',
+    title: 'Deckhand',
+    carry: 'Nothing (Empty hands, unseen eyes)',
+    holdAccess: 'Deck ventilation grate on the quarterdeck crawling directly into the cargo bilge.',
+    crewTreatment: 'Ignored as part of the woodwork; can crawl through vents and eavesdrop on the mutineers.',
+    sashColor: '#8a8f98',
+    sashColorName: 'Slate Grey',
+    journalEntry: {
+      id: 'clue_role_deckhand',
+      tab: 'Clues',
+      title: "Deckhand's Shadow",
+      text: "I carry nothing but callous on my hands. The crew look straight through me. I can crawl through the quarterdeck ventilation grate into the bilge, and listen unseen where other men dare not tread.",
+    },
+  },
+};
+
 

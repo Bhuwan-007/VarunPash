@@ -67,7 +67,7 @@ export class GameRenderer {
         const screenX = tx * TILE_SIZE - effectiveCamX;
         const screenY = ty * TILE_SIZE - effectiveCamY;
 
-        this.drawTile(tile, screenX, screenY, TILE_SIZE, tx, ty, state.scene, frameTime);
+        this.drawTile(tile, screenX, screenY, TILE_SIZE, tx, ty, state.scene, frameTime, state.playerRole);
       }
     }
 
@@ -82,6 +82,63 @@ export class GameRenderer {
       map.height,
       state.scene
     );
+
+    // Navigator Secret Stern Hatch: small marked glow on deck near helm (drawn only for Navigator)
+    if (state.scene === 'deck' && state.playerRole === 'navigator') {
+      const hx = 10 * TILE_SIZE - effectiveCamX;
+      const hy = 18 * TILE_SIZE - effectiveCamY;
+      const pulse = 0.5 + 0.5 * Math.sin(frameTime * 3);
+
+      ctx.save();
+      ctx.shadowColor = PALETTE.TideGlow;
+      ctx.shadowBlur = 12 + pulse * 6;
+      ctx.strokeStyle = `rgba(95, 211, 196, ${0.7 + pulse * 0.3})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(hx + 8, hy + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+
+      // Star cross mark
+      ctx.beginPath();
+      ctx.moveTo(hx + TILE_SIZE / 2, hy + 12);
+      ctx.lineTo(hx + TILE_SIZE / 2, hy + TILE_SIZE - 12);
+      ctx.moveTo(hx + 12, hy + TILE_SIZE / 2);
+      ctx.lineTo(hx + TILE_SIZE - 12, hy + TILE_SIZE / 2);
+      ctx.stroke();
+
+      // Small center star
+      ctx.fillStyle = PALETTE.TideGlow;
+      ctx.fillRect(hx + TILE_SIZE / 2 - 2, hy + TILE_SIZE / 2 - 2, 4, 4);
+      ctx.restore();
+    }
+
+    // Deckhand Quarterdeck Vent Grate (drawn only for Deckhand)
+    if (state.scene === 'deck' && state.playerRole === 'deckhand') {
+      const vx = 5 * TILE_SIZE - effectiveCamX;
+      const vy = 17 * TILE_SIZE - effectiveCamY;
+
+      ctx.save();
+      ctx.fillStyle = '#111822';
+      ctx.fillRect(vx + 10, vy + 10, TILE_SIZE - 20, TILE_SIZE - 20);
+      ctx.strokeStyle = '#4b5563';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(vx + 10, vy + 10, TILE_SIZE - 20, TILE_SIZE - 20);
+      for (let s = 16; s < TILE_SIZE - 10; s += 8) {
+        ctx.beginPath();
+        ctx.moveTo(vx + 12, vy + s);
+        ctx.lineTo(vx + TILE_SIZE - 12, vy + s);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Strongbox on Quarterdeck beside Helm
+    if (state.scene === 'deck') {
+      this.drawStrongboxProp(6 * CONFIG.TILE_SIZE - effectiveCamX, 20 * CONFIG.TILE_SIZE - effectiveCamY);
+    }
+
+    // Silver Locket on Main Deck near Hatch (drawn if not yet picked this loop)
+    if (state.scene === 'deck' && !state.hasPickedDeckLocket) {
+      this.drawSilverLocketProp(10 * CONFIG.TILE_SIZE - effectiveCamX, 12 * CONFIG.TILE_SIZE - effectiveCamY, frameTime);
+    }
 
     // --- LAYER 2c: Interactable Highlight (Brass Corner Brackets & Golden Aura) ---
     if (activeInteractable) {
@@ -166,7 +223,12 @@ export class GameRenderer {
     // 3e. Player
     const playerScreenX = player.x * TILE_SIZE - effectiveCamX;
     const playerScreenY = player.y * TILE_SIZE - effectiveCamY;
-    this.drawPlayer(player, playerScreenX, playerScreenY);
+    this.drawPlayer(player, playerScreenX, playerScreenY, state.playerRole);
+
+    // Danger confirmation progress ring (1.0s hold)
+    if (state.dangerHoldProgress > 0) {
+      this.drawDangerRing(playerScreenX + TILE_SIZE / 2, playerScreenY + TILE_SIZE / 2, state.dangerHoldProgress);
+    }
 
     // --- LAYER 4: Atmospheric Lighting & Lanterns ---
     const glowTargets: { x: number; y: number; color: string; radius: number }[] = [];
@@ -331,7 +393,8 @@ export class GameRenderer {
     tileX: number,
     tileY: number,
     scene: 'deck' | 'hold',
-    time: number
+    time: number,
+    playerRole: 'navigator' | 'quartermaster' | 'deckhand' = 'deckhand'
   ): void {
     const { ctx } = this;
 
@@ -917,6 +980,17 @@ export class GameRenderer {
 
           ctx.fillRect(screenX + size / 2 - 12, screenY + 38, 24, 24);
 
+          // Matching role sash on petrified statue
+          const statueSashColor =
+            playerRole === 'navigator'
+              ? '#2e6f9e'
+              : playerRole === 'quartermaster'
+              ? '#b23a3a'
+              : '#8a8f98';
+          ctx.fillStyle = statueSashColor;
+          ctx.fillRect(screenX + size / 2 - 13, screenY + 46, 26, 5);
+          ctx.fillRect(screenX + size / 2 + 3, screenY + 51, 4, 7);
+
           // Salt crust glint
           ctx.fillStyle = PALETTE.TideGlow;
           ctx.fillRect(screenX + size / 2 - 4, screenY + 22, 3, 3);
@@ -1076,7 +1150,12 @@ export class GameRenderer {
    * - Dark mariner leather boots stride with alternating cadence when moving.
    * - Cleanly planted side-by-side when standing still.
    */
-  private drawPlayer(player: ReadonlyGameState['player'], px: number, py: number): void {
+  private drawPlayer(
+    player: ReadonlyGameState['player'],
+    px: number,
+    py: number,
+    role: 'navigator' | 'quartermaster' | 'deckhand' = 'deckhand'
+  ): void {
     const { ctx } = this;
 
     ctx.save();
@@ -1129,8 +1208,14 @@ export class GameRenderer {
     ctx.lineTo(px + 13, py + 10);
     ctx.stroke();
 
-    // 4. Waist Sash in Tide Glow turquoise
-    ctx.fillStyle = PALETTE.TideGlow;
+    // 4. Waist Sash follows assigned role (blue, red, grey)
+    const sashColor =
+      role === 'navigator'
+        ? '#2e6f9e'
+        : role === 'quartermaster'
+        ? '#b23a3a'
+        : '#8a8f98';
+    ctx.fillStyle = sashColor;
     ctx.fillRect(px - 14, py + 1, 28, 5);
     // Hanging knot sash ends
     ctx.fillRect(px + (player.facing === 'left' ? -10 : 4), py + 6, 5, 8);
@@ -2018,6 +2103,161 @@ export class GameRenderer {
 
     ctx.fillStyle = PALETTE.Lantern;
     ctx.fillText(message, CONFIG.CANVAS_WIDTH / 2, 107);
+    ctx.restore();
+  }
+
+  /**
+   * Quarterdeck Strongbox beside the helm. Heavy iron chest with brass banding
+   * and 3-digit combination tumbler lock.
+   */
+  private drawStrongboxProp(screenX: number, screenY: number): void {
+    const { ctx } = this;
+    const { TILE_SIZE } = CONFIG;
+    const pad = 12;
+    const w = TILE_SIZE - pad * 2;
+    const h = TILE_SIZE - pad * 2;
+    const x = screenX + pad;
+    const y = screenY + pad;
+
+    ctx.save();
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(x - 2, y + 4, w + 4, h);
+
+    // Dark iron chest casing
+    ctx.fillStyle = '#1c2430';
+    ctx.fillRect(x, y, w, h);
+
+    // Brass reinforced corner banding
+    ctx.fillStyle = '#b38235';
+    ctx.fillRect(x, y, 6, h);
+    ctx.fillRect(x + w - 6, y, 6, h);
+    ctx.fillRect(x, y + h / 2 - 2, w, 4);
+
+    // Outer border
+    ctx.strokeStyle = '#0f141a';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x, y, w, h);
+
+    // 3-digit tumbler combination dial panel
+    const lockW = 18;
+    const lockH = 12;
+    const lx = x + (w - lockW) / 2;
+    const ly = y + (h - lockH) / 2;
+    ctx.fillStyle = '#d4af37';
+    ctx.fillRect(lx, ly, lockW, lockH);
+    ctx.strokeStyle = '#7a5a1e';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(lx, ly, lockW, lockH);
+
+    // 3 small tumbler dials
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(lx + 2, ly + 3, 3, 6);
+    ctx.fillRect(lx + 7, ly + 3, 3, 6);
+    ctx.fillRect(lx + 12, ly + 3, 3, 6);
+
+    ctx.restore();
+  }
+
+  /**
+   * Silver Locket on Main Deck near Hatch. Pickable silver medallion
+   * resting on oak deck planks with subtle gleaming shine.
+   */
+  private drawSilverLocketProp(screenX: number, screenY: number, time: number): void {
+    const { ctx } = this;
+    const { TILE_SIZE } = CONFIG;
+    const cx = screenX + TILE_SIZE / 2;
+    const cy = screenY + TILE_SIZE / 2;
+    const pulse = 0.5 + 0.5 * Math.sin(time * 4);
+
+    ctx.save();
+    // Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 3, 9, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Gleam halo
+    ctx.shadowColor = '#e2e8f0';
+    ctx.shadowBlur = 6 + pulse * 4;
+
+    // Silver medallion disc
+    ctx.fillStyle = '#cbd5e1';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Darker silver bevel
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Concentric engraving
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Specular highlight
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.7 + pulse * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(cx - 1.5, cy - 1.5, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  /**
+   * Danger confirmation progress ring (1.0 second hold E).
+   * Displays radial progress arc in BloodRust with a floating danger indicator.
+   */
+  private drawDangerRing(centerX: number, centerY: number, progress: number): void {
+    const { ctx } = this;
+    const radius = 34;
+
+    ctx.save();
+    // Backdrop dark circle
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.45)';
+    ctx.fill();
+
+    // Background track ring
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(178, 58, 58, 0.25)';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+
+    // Active progress arc (fills clockwise from top)
+    ctx.beginPath();
+    const startAngle = -Math.PI / 2;
+    const endAngle = startAngle + progress * (Math.PI * 2);
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.strokeStyle = PALETTE.BloodRust;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.shadowColor = PALETTE.BloodRust;
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+
+    // Danger badge pill above ring
+    const badgeY = centerY - radius - 14;
+    const badgeW = 96;
+    const badgeH = 18;
+    ctx.fillStyle = 'rgba(178, 58, 58, 0.9)';
+    ctx.fillRect(centerX - badgeW / 2, badgeY - badgeH / 2, badgeW, badgeH);
+    ctx.strokeStyle = PALETTE.Bone;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(centerX - badgeW / 2, badgeY - badgeH / 2, badgeW, badgeH);
+
+    ctx.fillStyle = PALETTE.Bone;
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('HOLDING [E]...', centerX, badgeY);
+
     ctx.restore();
   }
 }

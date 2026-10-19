@@ -65,6 +65,47 @@
       },
       "priority": 35,
       "journalNote": "Isha says she can drive off the Leviathan if the helm plate is held steady while she fires."
+    },
+    {
+      "id": "isha_role_navigator",
+      "text": "Keep her steady into the wind, Navigator. If you give me a level deck, my guns will tear anything out of the water.",
+      "when": {
+        "role": "navigator"
+      },
+      "priority": 45,
+      "journalNote": "Isha needs the Navigator to keep the ship level so her port cannons can hold their aim."
+    },
+    {
+      "id": "isha_role_quartermaster",
+      "text": "Quartermaster, don't skimp on my powder measures. When the sea starts boiling, I don't want damp cartridges in my magazines.",
+      "when": {
+        "role": "quartermaster"
+      },
+      "priority": 45,
+      "journalNote": "Isha bluntly demanded full dry powder rations from the Quartermaster."
+    },
+    {
+      "id": "isha_role_deckhand",
+      "text": "Clear the recoil tracks, deckhand! One step wrong when the 18-pounder kicks and you're pulp.",
+      "when": {
+        "role": "deckhand"
+      },
+      "priority": 45,
+      "journalNote": "Isha barked at me to mind the gun tackle. A stern warning about cannon recoil."
+    },
+    {
+      "id": "isha_react_makara",
+      "text": "You keep scanning the port water like you're tracking a shadow. My guns are primed for whatever surfaces.",
+      "requires": ["K_Makara_WEAKNESS"],
+      "priority": 50,
+      "journalNote": "Isha noticed my attention on the port swells, readying her guns."
+    },
+    {
+      "id": "isha_react_chant",
+      "text": "There's a strange chime vibrating in the planking... almost sounds like chanting from the deep.",
+      "requires": ["K_CHANT"],
+      "priority": 50,
+      "journalNote": "Isha felt the humming resonance in the ship's timbers."
     }
   ]
 }
