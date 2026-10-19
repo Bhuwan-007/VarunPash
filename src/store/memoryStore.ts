@@ -31,6 +31,8 @@ export interface MemoryState {
   lastDeathRemembered: string | null;
   shipTimeAtDeath: number | null;
   gullSeenLoops: number[];
+  lastShownDialogue: Record<string, string[]>;
+  storyLinesSeen: string[];
 
   // Actions
   addKnowledge: (flag: string, entry?: JournalEntry) => boolean;
@@ -46,6 +48,7 @@ export interface MemoryState {
   setPlayerRole: (role: 'navigator' | 'quartermaster' | 'deckhand') => void;
   recordGullSighting: (loopNumber: number) => boolean;
   recordEnding: (endingId: string) => void;
+  recordShownLine: (npcId: string, lineId: string, isStory?: boolean) => void;
 }
 
 
@@ -76,6 +79,8 @@ function savePersistedState(state: MemoryState): void {
       lastDeathRemembered: state.lastDeathRemembered,
       shipTimeAtDeath: state.shipTimeAtDeath,
       gullSeenLoops: state.gullSeenLoops,
+      lastShownDialogue: state.lastShownDialogue,
+      storyLinesSeen: state.storyLinesSeen,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   } catch (err) {
@@ -97,6 +102,8 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   lastDeathRemembered: initialPersisted.lastDeathRemembered ?? null,
   shipTimeAtDeath: initialPersisted.shipTimeAtDeath ?? null,
   gullSeenLoops: (initialPersisted as any).gullSeenLoops ?? [],
+  lastShownDialogue: (initialPersisted as any).lastShownDialogue ?? {},
+  storyLinesSeen: (initialPersisted as any).storyLinesSeen ?? [],
 
   addKnowledge: (flag: string, entry?: JournalEntry) => {
     const state = get();
@@ -193,6 +200,8 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       lastDeathRemembered: null,
       shipTimeAtDeath: null,
       gullSeenLoops: [],
+      lastShownDialogue: fullReset ? {} : get().lastShownDialogue,
+      storyLinesSeen: fullReset ? [] : get().storyLinesSeen,
       addKnowledge: get().addKnowledge,
       addJournalEntry: get().addJournalEntry,
       markTabRead: get().markTabRead,
@@ -201,6 +210,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       setPlayerRole: get().setPlayerRole,
       recordGullSighting: get().recordGullSighting,
       recordEnding: get().recordEnding,
+      recordShownLine: get().recordShownLine,
     };
 
     set(fresh);
@@ -246,6 +256,26 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       return true;
     }
     return false;
+  },
+
+  recordShownLine: (npcId: string, lineId: string, isStory?: boolean) => {
+    const state = get();
+    const currentList = state.lastShownDialogue[npcId] ?? [];
+    // Keep last 6 lines in memory, but dialogue selector checks last 3
+    const nextList = [lineId, ...currentList.filter((id) => id !== lineId)].slice(0, 6);
+    const nextLastShown = {
+      ...state.lastShownDialogue,
+      [npcId]: nextList,
+    };
+    let nextStorySeen = state.storyLinesSeen;
+    if (isStory && !nextStorySeen.includes(lineId)) {
+      nextStorySeen = [...nextStorySeen, lineId];
+    }
+    set({
+      lastShownDialogue: nextLastShown,
+      storyLinesSeen: nextStorySeen,
+    });
+    savePersistedState(get());
   },
 }));
 

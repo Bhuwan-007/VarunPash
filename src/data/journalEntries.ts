@@ -168,6 +168,49 @@ export const INITIAL_CLUES_ENTRY: JournalEntryDef = {
 
 export const PINNED_OBJECTIVE = 'Learn what sinks the Jal-Doot. Remember it. Use it.';
 
+export function getNextLead(knowledge: string[]): { title: string; hint: string } {
+  // 1. Cabin door / safe
+  if (!knowledge.includes('K_SAFE_CODE')) {
+    return {
+      title: 'Next Lead: The Captain’s Cabin',
+      hint: "Nakhuda's cabin is barred. Someone inside knows something.",
+    };
+  }
+  // 2. Kedar / mutiny
+  if (!knowledge.includes('K_MUTINEER')) {
+    return {
+      title: 'Next Lead: Whispers on Deck',
+      hint: 'Kedar whispers with the crew before the bell. What are they planning?',
+    };
+  }
+  // 3. Makara weakness
+  if (!knowledge.includes('K_Makara_WEAKNESS') && !knowledge.includes('K_LEVIATHAN_WEAKNESS')) {
+    return {
+      title: 'Next Lead: The Port Deep',
+      hint: 'At the eighth bell, something rises from the port deep. Witness its wound.',
+    };
+  }
+  // 4. Kaal Mani relic chant
+  if (!knowledge.includes('K_CHANT')) {
+    return {
+      title: 'Next Lead: The Hold Relic',
+      hint: 'A humming stone rests in the hold. It speaks in a voice you know.',
+    };
+  }
+  // 5. Statue truth
+  if (!knowledge.includes('K_STATUE_TRUTH')) {
+    return {
+      title: 'Next Lead: The Stone Twin',
+      hint: 'The stone figure in the hold clutches a locket. Examine where the voice truly belongs.',
+    };
+  }
+  // All clues learned
+  return {
+    title: 'Next Lead: Break the Circle',
+    hint: 'The circle is closing. Find a way to speak the chant without paying with your life.',
+  };
+}
+
 export const NPC_PROFILE_CARDS: Record<string, { id: string; name: string; role: string; description: string }> = {
   bhima: {
     id: 'card_bhima',

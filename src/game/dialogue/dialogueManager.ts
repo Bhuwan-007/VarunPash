@@ -31,6 +31,7 @@ export interface DialogueLine {
   minLoop?: number;
   grants?: string[];
   once?: boolean;
+  talkCountMin?: number;
 }
 
 export interface DialogueData {
@@ -66,10 +67,14 @@ export class DialogueManager {
     const currentRole = memoryState.playerRole;
     const currentLoop = memoryState.deathCount + 1; // 0 deaths = Loop 1
 
+    // Increment talk count for this NPC in the current loop
+    const talkCount = useLoopStore.getState().incrementTalkCount(npcId);
+
     // Filter lines whose 'when' condition, requirements, role, and minLoop match live state
     const candidateLines = data.lines.filter((line) => {
-      // 1. Check once flag
-      if (line.once && this.shownLineIds.has(line.id)) {
+      // 1. Check once flag against both local set and persisted storyLinesSeen
+      const isAlreadySeen = this.shownLineIds.has(line.id) || (memoryState.storyLinesSeen?.includes(line.id) ?? false);
+      if (line.once && isAlreadySeen) {
         return false;
       }
 
@@ -111,14 +116,72 @@ export class DialogueManager {
       return null;
     }
 
-    // Sort by priority descending (highest priority line wins)
-    candidateLines.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
-    const chosenLine = candidateLines[0];
+    const lastShown = memoryState.lastShownDialogue?.[npcId] ?? [];
+    const last1Shown = lastShown[0];
+    const last3Shown = new Set(lastShown.slice(0, 3));
 
-    // Mark as shown if once
-    if (chosenLine.once) {
-      this.shownLineIds.add(chosenLine.id);
+    let chosenLine: DialogueLine | null = null;
+
+    // TIER 1: Unseen story lines (once: true). Choose highest priority
+    const unseenStoryLines = candidateLines.filter((l) => l.once);
+    if (unseenStoryLines.length > 0) {
+      unseenStoryLines.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+      chosenLine = unseenStoryLines[0];
     }
+
+    // TIER 2: If no unseen story line, check for escalation if player talks repeatedly
+    if (!chosenLine && talkCount >= 2) {
+      // Find matching escalation lines where talkCount >= talkCountMin
+      const escalationLines = candidateLines.filter(
+        (l) => l.talkCountMin !== undefined && talkCount >= l.talkCountMin && l.id !== last1Shown
+      );
+      if (escalationLines.length > 0) {
+        escalationLines.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+        chosenLine = escalationLines[0];
+      }
+    }
+
+    // TIER 3: Flavor line selection (weighted toward unseen, never one of last 3, never same twice)
+    if (!chosenLine) {
+      // Exclude escalation lines if talkCount < line.talkCountMin
+      const availableFlavor = candidateLines.filter((l) => {
+        if (l.talkCountMin && talkCount < l.talkCountMin) return false;
+        return true;
+      });
+
+      // Filter out last 3 shown
+      let pool = availableFlavor.filter((l) => !last3Shown.has(l.id));
+
+      // If pool is empty because all lines have been seen recently, relax to not being same twice in a row
+      if (pool.length === 0) {
+        pool = availableFlavor.filter((l) => l.id !== last1Shown);
+      }
+      if (pool.length === 0) {
+        pool = availableFlavor;
+      }
+
+      // Weight towards lines that haven't been shown recently or at all
+      const weightedList: DialogueLine[] = [];
+      for (const line of pool) {
+        const hasBeenShown = lastShown.includes(line.id) || this.shownLineIds.has(line.id);
+        const weight = hasBeenShown ? 1 : 3;
+        for (let i = 0; i < weight; i++) {
+          weightedList.push(line);
+        }
+      }
+
+      // Pick randomly from weighted pool
+      const pickIdx = Math.floor(Math.random() * weightedList.length);
+      chosenLine = weightedList[pickIdx] ?? pool[0];
+    }
+
+    if (!chosenLine) {
+      return null;
+    }
+
+    // Mark as shown in session set and persisted memory store
+    this.shownLineIds.add(chosenLine.id);
+    useMemoryStore.getState().recordShownLine(npcId, chosenLine.id, chosenLine.once);
 
     // First talk with NPC creates NPC card in People tab
     const profile = NPC_PROFILE_CARDS[npcId];

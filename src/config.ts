@@ -29,7 +29,7 @@ export function startTimeForDeaths(deathCount: number): number {
 }
 
 // Dev-only unit test assertions
-if (import.meta.env.DEV) {
+if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
   console.assert(startTimeForDeaths(0) === 0, 'startTimeForDeaths(0) must equal 0');
   console.assert(startTimeForDeaths(1) === 30, 'startTimeForDeaths(1) must equal 30');
   console.assert(startTimeForDeaths(2) === 60, 'startTimeForDeaths(2) must equal 60');

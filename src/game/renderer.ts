@@ -2,6 +2,7 @@ import { CONFIG, PALETTE } from '../config';
 import { LightingEffect } from './effects/lightingEffect';
 import { WaterEffect } from './effects/waterEffect';
 import { ReadonlyGameState } from './engine';
+import { getInteractableScreenBounds } from './interactableBounds';
 import { NpcScheduleState } from './systems/npcScheduler';
 import { TileType } from './world/deckMap';
 
@@ -142,7 +143,7 @@ export class GameRenderer {
 
     // --- LAYER 2c: Interactable Highlight (Brass Corner Brackets & Golden Aura) ---
     if (activeInteractable) {
-      this.drawInteractableHighlight(activeInteractable, effectiveCamX, effectiveCamY, frameTime);
+      this.drawInteractableHighlight(activeInteractable, effectiveCamX, effectiveCamY, frameTime, state.shipTime);
     }
 
     // --- LAYER 3: Entities (Player & NPCs) ---
@@ -155,10 +156,13 @@ export class GameRenderer {
       }
     }
 
-    // 3b. Mutineers (hooded, grey, no red sash)
+    // 3b. Mutineers (hooded, grey, no red sash, with floating label "Mutineer")
     for (const m of state.mutineers) {
       if (m.scene === state.scene) {
-        this.drawMutineerSilhouette(m.x * TILE_SIZE - effectiveCamX, m.y * TILE_SIZE - effectiveCamY, m.facing);
+        const mx = m.x * TILE_SIZE - effectiveCamX;
+        const my = m.y * TILE_SIZE - effectiveCamY;
+        this.drawMutineerSilhouette(mx, my, m.facing);
+        this.drawMutineerNamePill(mx, my, 'Mutineer');
       }
     }
 
@@ -183,6 +187,7 @@ export class GameRenderer {
             break;
           case 'kedar':
             this.drawKedarNPC(nx, ny, npc, state.shipTime);
+            this.drawKedarNamePill(nx, ny, 'First Mate Kedar');
             break;
           case 'bhima':
             this.drawBhimaNPC(nx, ny, npc);
@@ -195,9 +200,9 @@ export class GameRenderer {
             break;
         }
 
-        // Proximity name badge pill (within 2.5 tiles)
+        // Proximity name badge pill (within 2.5 tiles, for other NPCs)
         const distToPlayer = Math.hypot(player.x - npc.x, player.y - npc.y);
-        if (distToPlayer <= 2.5 && !npc.isDead) {
+        if (distToPlayer <= 2.5 && !npc.isDead && npc.id !== 'kedar') {
           this.drawNpcNamePill(nx, ny, npc.name, npc.role);
         }
       }
@@ -311,7 +316,7 @@ export class GameRenderer {
 
     // --- LAYER 5: In-world Floating Prompts [E] ---
     if (activeInteractable) {
-      this.drawInteractionPrompt(activeInteractable, effectiveCamX, effectiveCamY);
+      this.drawInteractionPrompt(activeInteractable, effectiveCamX, effectiveCamY, state.shipTime);
     }
 
     // In-game message notification banner
@@ -1116,64 +1121,79 @@ export class GameRenderer {
     interactable: NonNullable<ReadonlyGameState['activeInteractable']>,
     camX: number,
     camY: number,
-    time: number
+    time: number,
+    shipTime: number
   ): void {
     const { ctx } = this;
-    const { TILE_SIZE } = CONFIG;
-
-    const baseW = interactable.width ?? 1;
-    const baseH = interactable.height ?? 1;
-    const bounds = interactable.highlightSize;
-
-    // Use per-object tunable highlight bounds or default to tight 0.5 size centered
-    const hlW = (bounds?.width ?? (baseW * 0.5)) * TILE_SIZE;
-    const hlH = (bounds?.height ?? (baseH * 0.5)) * TILE_SIZE;
-    const hlOffsetX = (bounds?.offsetX ?? ((baseW - (bounds?.width ?? (baseW * 0.5))) / 2)) * TILE_SIZE;
-    const hlOffsetY = (bounds?.offsetY ?? ((baseH - (bounds?.height ?? (baseH * 0.5))) / 2)) * TILE_SIZE;
-
-    const ix = interactable.x * TILE_SIZE + hlOffsetX - camX;
-    const iy = interactable.y * TILE_SIZE + hlOffsetY - camY;
-
+    const bounds = getInteractableScreenBounds(interactable, shipTime, camX, camY);
     const pulse = 0.5 + 0.5 * Math.sin(time * 5);
 
     ctx.save();
 
-    // 1. Soft subtle golden ambient glow
-    ctx.fillStyle = `rgba(229, 169, 59, ${0.08 + pulse * 0.06})`;
-    ctx.fillRect(ix, iy, hlW, hlH);
+    if (bounds.isNpc) {
+      // Anchored Feet Circle Highlight (Item B)
+      ctx.beginPath();
+      ctx.ellipse(bounds.feetX, bounds.feetY, 16, 7, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(242, 165, 65, ${0.15 + pulse * 0.12})`;
+      ctx.fill();
 
-    // 2. Small nautical brass corner brackets (tight, hugging bounds)
-    const armLen = Math.max(5, Math.min(8, hlW / 4, hlH / 4));
-    ctx.strokeStyle = PALETTE.Lantern;
-    ctx.lineWidth = 1.8;
+      ctx.strokeStyle = PALETTE.Lantern;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
 
-    // Top-Left corner
-    ctx.beginPath();
-    ctx.moveTo(ix, iy + armLen);
-    ctx.lineTo(ix, iy);
-    ctx.lineTo(ix + armLen, iy);
-    ctx.stroke();
+      // Small nautical brass corner markers around feet ellipse
+      const fx = bounds.feetX;
+      const fy = bounds.feetY;
+      ctx.beginPath();
+      ctx.moveTo(fx - 18, fy - 3);
+      ctx.lineTo(fx - 18, fy + 3);
+      ctx.moveTo(fx + 18, fy - 3);
+      ctx.lineTo(fx + 18, fy + 3);
+      ctx.stroke();
+    } else {
+      // Static object bounds highlight
+      const ix = bounds.centerX - bounds.width / 2;
+      const iy = bounds.centerY - bounds.height / 2;
+      const hlW = bounds.width;
+      const hlH = bounds.height;
 
-    // Top-Right corner
-    ctx.beginPath();
-    ctx.moveTo(ix + hlW - armLen, iy);
-    ctx.lineTo(ix + hlW, iy);
-    ctx.lineTo(ix + hlW, iy + armLen);
-    ctx.stroke();
+      // Soft subtle golden ambient glow
+      ctx.fillStyle = `rgba(229, 169, 59, ${0.08 + pulse * 0.06})`;
+      ctx.fillRect(ix, iy, hlW, hlH);
 
-    // Bottom-Left corner
-    ctx.beginPath();
-    ctx.moveTo(ix, iy + hlH - armLen);
-    ctx.lineTo(ix, iy + hlH);
-    ctx.lineTo(ix + armLen, iy + hlH);
-    ctx.stroke();
+      // Small nautical brass corner brackets
+      const armLen = Math.max(5, Math.min(8, hlW / 4, hlH / 4));
+      ctx.strokeStyle = PALETTE.Lantern;
+      ctx.lineWidth = 1.8;
 
-    // Bottom-Right corner
-    ctx.beginPath();
-    ctx.moveTo(ix + hlW - armLen, iy + hlH);
-    ctx.lineTo(ix + hlW, iy + hlH);
-    ctx.lineTo(ix + hlW, iy + hlH - armLen);
-    ctx.stroke();
+      // Top-Left corner
+      ctx.beginPath();
+      ctx.moveTo(ix, iy + armLen);
+      ctx.lineTo(ix, iy);
+      ctx.lineTo(ix + armLen, iy);
+      ctx.stroke();
+
+      // Top-Right corner
+      ctx.beginPath();
+      ctx.moveTo(ix + hlW - armLen, iy);
+      ctx.lineTo(ix + hlW, iy);
+      ctx.lineTo(ix + hlW, iy + armLen);
+      ctx.stroke();
+
+      // Bottom-Left corner
+      ctx.beginPath();
+      ctx.moveTo(ix, iy + hlH - armLen);
+      ctx.lineTo(ix, iy + hlH);
+      ctx.lineTo(ix + armLen, iy + hlH);
+      ctx.stroke();
+
+      // Bottom-Right corner
+      ctx.beginPath();
+      ctx.moveTo(ix + hlW - armLen, iy + hlH);
+      ctx.lineTo(ix + hlW, iy + hlH);
+      ctx.lineTo(ix + hlW, iy + hlH - armLen);
+      ctx.stroke();
+    }
 
     ctx.restore();
   }
@@ -1751,6 +1771,58 @@ export class GameRenderer {
     ctx.restore();
   }
 
+  private drawMutineerNamePill(mx: number, my: number, label: string): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 11px monospace';
+
+    const textWidth = ctx.measureText(label).width;
+    const pillW = textWidth + 12;
+    const pillH = 16;
+    const pillX = mx - pillW / 2;
+    const pillY = my - 38;
+
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.85)';
+    ctx.fillRect(pillX, pillY, pillW, pillH);
+
+    ctx.strokeStyle = '#4b5563';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(pillX, pillY, pillW, pillH);
+
+    ctx.fillStyle = '#d1d5db';
+    ctx.fillText(label, mx, pillY + pillH / 2);
+
+    ctx.restore();
+  }
+
+  private drawKedarNamePill(kx: number, ky: number, label: string): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 12px monospace';
+
+    const textWidth = ctx.measureText(label).width;
+    const pillW = textWidth + 16;
+    const pillH = 18;
+    const pillX = kx - pillW / 2;
+    const pillY = ky - 44;
+
+    ctx.fillStyle = 'rgba(7, 9, 15, 0.9)';
+    ctx.fillRect(pillX, pillY, pillW, pillH);
+
+    ctx.strokeStyle = PALETTE.BloodRust;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(pillX, pillY, pillW, pillH);
+
+    ctx.fillStyle = PALETTE.Lantern;
+    ctx.fillText(label, kx, pillY + pillH / 2);
+
+    ctx.restore();
+  }
+
   /**
    * Gull Omen at 355: perched on main mast yardarm, looking down.
    */
@@ -1835,10 +1907,13 @@ export class GameRenderer {
   }
 
   /**
-   * Makara Leviathan Breach (480+):
-   * Rises over 3s filling the left third of the screen regardless of player position.
-   * Lunges at the port deck every 8 to 10 seconds.
-   * Features jaw, ribbed neck, glowing amber eye, and Tide Glow harpoon in throat.
+   * Makara Leviathan Silhouette (Item E):
+   * Pure ominous nautical horror silhouette rising from the port water:
+   * - Giant near-black shape (#04070d) occupying 35-40% of screen width (left ~460-480px).
+   * - One glowing amber eye with a vertical slit pupil.
+   * - Harpoon in the throat as a bright Tide Glow (#5fd3c4) line with soft cyan aura.
+   * - Animated ragged ripple edges along its crest, streaming water cascades, and sea foam spray.
+   * - Periodic deck slam every 8-10 seconds with massive water splash and screen tremor.
    */
   private drawMakaraBreach(
     ctx: CanvasRenderingContext2D,
@@ -1846,143 +1921,141 @@ export class GameRenderer {
     shipTime: number
   ): void {
     const rise = Math.min(1.0, (shipTime - 480) / 3.0);
-    const breathe = Math.sin(frameTime * 1.8) * 6;
+    const breathe = Math.sin(frameTime * 1.5) * 8;
     const pulse = 0.5 + 0.5 * Math.sin(frameTime * 4);
 
-    // Periodic lunge every 8 to 10 seconds (9s period)
-    const lungeCycle = (shipTime - 480) % 9.0;
-    let lungeX = 0;
-    let lungeY = 0;
-    if (lungeCycle >= 6.5 && lungeCycle <= 8.5) {
-      const progress = (lungeCycle - 6.5) / 2.0;
-      lungeX = Math.sin(progress * Math.PI) * 110;
-      lungeY = Math.sin(progress * Math.PI * 2) * 22;
+    // Periodic deck slam every 8 to 10 seconds (9s period)
+    const slamCycle = (shipTime - 480) % 9.0;
+    let slamX = 0;
+    let slamY = 0;
+    const isSlamming = slamCycle >= 7.2 && slamCycle <= 8.4;
+    if (isSlamming) {
+      const slamProgress = (slamCycle - 7.2) / 1.2;
+      slamX = Math.sin(slamProgress * Math.PI) * 135; // surges forward across port rail
+      slamY = Math.sin(slamProgress * Math.PI) * 16;
     }
 
-    // Screen-anchored filling about the left third of the screen (0 to ~400px)
-    const mx = 180 + lungeX;
-    const my = CONFIG.CANVAS_HEIGHT * 0.48 + (1.0 - rise) * 520 + lungeY + breathe;
+    // Anchored to port side: occupies ~35-40% of 1280px screen (~470px wide)
+    const baseX = 200 + slamX;
+    const baseY = CONFIG.CANVAS_HEIGHT * 0.46 + (1.0 - rise) * 540 + slamY + breathe;
 
     ctx.save();
 
     // 1. Violent ocean spray & foam swells around breach
-    ctx.fillStyle = 'rgba(232, 240, 245, 0.55)';
-    for (let i = 0; i < 9; i++) {
-      const foamX = mx - 90 + i * 36 + Math.sin(frameTime * 3 + i) * 10;
-      const foamY = my + 130 - Math.abs(i - 4) * 12 + Math.cos(frameTime * 2.5 + i) * 6;
+    ctx.fillStyle = 'rgba(210, 230, 240, 0.4)';
+    for (let i = 0; i < 11; i++) {
+      const foamX = baseX - 120 + i * 40 + Math.sin(frameTime * 3 + i) * 12;
+      const foamY = baseY + 140 - Math.abs(i - 5) * 14 + Math.cos(frameTime * 2.5 + i) * 8;
       ctx.beginPath();
-      ctx.arc(foamX, foamY, 26 + Math.sin(frameTime * 2 + i) * 8, 0, Math.PI * 2);
+      ctx.arc(foamX, foamY, 28 + Math.sin(frameTime * 2 + i) * 10, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // 2. Colossal Dark Slate Armored Serpentine Ribbed Neck & Body
-    ctx.fillStyle = '#081720';
+    // 2. Colossal Near-Black Silhouette Body (Occupies ~38% screen width)
+    ctx.fillStyle = '#04070d'; // Near-black silhouette
     ctx.beginPath();
-    ctx.moveTo(mx - 180, my + 300);
-    ctx.quadraticCurveTo(mx - 80, my - 90, mx + 75, my - 60);
-    ctx.quadraticCurveTo(mx + 110, my + 30, mx + 50, my + 95);
-    ctx.quadraticCurveTo(mx - 15, my + 200, mx - 120, my + 300);
+    ctx.moveTo(baseX - 220, baseY + 350);
+
+    // Animated ragged ripple edges along dorsal curve
+    const rippleCount = 8;
+    for (let r = 0; r <= rippleCount; r++) {
+      const rt = r / rippleCount;
+      const rx = (baseX - 220) + (baseX + 110 - (baseX - 220)) * rt;
+      const ry = (baseY + 350) + (baseY - 90 - (baseY + 350)) * rt;
+      const rippleOffset = Math.sin(frameTime * 5 + r * 1.5) * 7;
+      ctx.lineTo(rx + rippleOffset, ry);
+    }
+
+    // Massive head curve and jaw outline
+    ctx.quadraticCurveTo(baseX + 180, baseY - 60, baseX + 260, baseY - 15);
+    ctx.quadraticCurveTo(baseX + 190, baseY + 45, baseX + 270, baseY + 80);
+    ctx.quadraticCurveTo(baseX + 160, baseY + 120, baseX + 70, baseY + 150);
+    ctx.quadraticCurveTo(baseX - 40, baseY + 230, baseX - 160, baseY + 350);
     ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = '#050c12';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
-    // Armored dorsal scutes / ribbed neck spines
-    ctx.fillStyle = '#163542';
-    ctx.strokeStyle = '#07090f';
-    ctx.lineWidth = 2.5;
-    for (let s = 0; s < 7; s++) {
-      const spX = mx - 110 + s * 28;
-      const spY = my - 50 + s * 22;
-      ctx.beginPath();
-      ctx.moveTo(spX, spY);
-      ctx.lineTo(spX - 18, spY - 35);
-      ctx.lineTo(spX + 14, spY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    // 3. Colossal Armored Lower and Upper Jaw
-    ctx.fillStyle = '#0b1d28';
-    ctx.beginPath();
-    ctx.moveTo(mx + 60, my - 60);
-    ctx.lineTo(mx + 155, my - 25);
-    ctx.lineTo(mx + 90, my + 15);
-    ctx.lineTo(mx + 160, my + 55);
-    ctx.lineTo(mx + 45, my + 70);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // 4. Curved Ivory Leviathan Fangs (Bone)
-    ctx.fillStyle = PALETTE.Bone;
-    for (let f = 0; f < 5; f++) {
-      const fangUpperX = mx + 60 + f * 18;
-      const fangUpperY = my - 45 + f * 6;
-      ctx.beginPath();
-      ctx.moveTo(fangUpperX, fangUpperY);
-      ctx.lineTo(fangUpperX + 8, fangUpperY + 24);
-      ctx.lineTo(fangUpperX + 16, fangUpperY);
-      ctx.closePath();
-      ctx.fill();
-
-      const fangLowerX = mx + 55 + f * 18;
-      const fangLowerY = my + 45 - f * 4;
-      ctx.beginPath();
-      ctx.moveTo(fangLowerX, fangLowerY);
-      ctx.lineTo(fangLowerX + 7, fangLowerY - 22);
-      ctx.lineTo(fangLowerX + 15, fangLowerY);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    // 5. Glowing Amber Leviathan Eye with vertical slit pupil
-    const eyeX = mx + 45;
-    const eyeY = my - 25;
-
-    ctx.fillStyle = '#f2a541'; // Amber
-    ctx.beginPath();
-    ctx.ellipse(eyeX, eyeY, 15, 20, 0.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = PALETTE.Tar;
+    // Subtle dark rim outline
+    ctx.strokeStyle = '#020306';
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Slit pupil
-    ctx.fillStyle = PALETTE.Tar;
+    // 3. Streaming water cascades draining down the black hide
+    ctx.fillStyle = 'rgba(160, 205, 220, 0.25)';
+    for (let w = 0; w < 9; w++) {
+      const streamX = baseX - 100 + w * 38 + Math.sin(frameTime * 4 + w) * 6;
+      const streamY = baseY - 20 + w * 12 + ((frameTime * 160 + w * 40) % 240);
+      const streamH = 24 + Math.sin(w) * 12;
+      ctx.fillRect(streamX, streamY, 2.5, streamH);
+    }
+
+    // 4. One Glowing Amber Eye with Vertical Slit Pupil
+    const eyeX = baseX + 140;
+    const eyeY = baseY - 22;
+
+    // Amber radial illumination
+    const amberGlow = ctx.createRadialGradient(eyeX, eyeY, 4, eyeX, eyeY, 36);
+    amberGlow.addColorStop(0, `rgba(251, 191, 36, ${0.85 + pulse * 0.15})`);
+    amberGlow.addColorStop(0.4, 'rgba(245, 158, 11, 0.45)');
+    amberGlow.addColorStop(1, 'rgba(217, 119, 6, 0)');
+    ctx.fillStyle = amberGlow;
     ctx.beginPath();
-    ctx.ellipse(eyeX, eyeY, 4, 18, 0.2, 0, Math.PI * 2);
+    ctx.arc(eyeX, eyeY, 36, 0, Math.PI * 2);
     ctx.fill();
 
-    // 6. Pulsing Tide Glow Harpoon Point embedded in throat (#5fd3c4)
-    const harpX = mx + 25;
-    const harpY = my + 65;
-
-    // Glowing radiating aura
-    ctx.fillStyle = `rgba(95, 211, 196, ${0.45 + pulse * 0.45})`;
+    // Amber eyeball
+    ctx.fillStyle = '#fbbf24';
     ctx.beginPath();
-    ctx.arc(harpX, harpY, 34 + pulse * 14, 0, Math.PI * 2);
+    ctx.ellipse(eyeX, eyeY, 13, 18, 0.15, 0, Math.PI * 2);
     ctx.fill();
-
-    // Heavy iron harpoon shaft
-    ctx.strokeStyle = '#2b3e45';
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(harpX + 40, harpY - 30);
-    ctx.lineTo(harpX - 8, harpY + 16);
+    ctx.strokeStyle = '#04070d';
+    ctx.lineWidth = 2.5;
     ctx.stroke();
 
-    // Barbed Tide Glow harpoon tip
-    ctx.fillStyle = PALETTE.TideGlow;
+    // Dark vertical slit pupil
+    ctx.fillStyle = '#04070d';
     ctx.beginPath();
-    ctx.moveTo(harpX - 10, harpY + 18);
-    ctx.lineTo(harpX - 26, harpY + 5);
-    ctx.lineTo(harpX - 8, harpY - 8);
-    ctx.closePath();
+    ctx.ellipse(eyeX, eyeY, 3.2, 16, 0.15, 0, Math.PI * 2);
     ctx.fill();
+
+    // 5. Bright Tide Glow Harpoon Line in the Throat (#5fd3c4)
+    const harpX = baseX + 80;
+    const harpY = baseY + 85;
+
+    // Glowing cyan/teal aura around wound
+    const tealAura = ctx.createRadialGradient(harpX, harpY, 2, harpX, harpY, 28);
+    tealAura.addColorStop(0, `rgba(95, 211, 196, ${0.7 + pulse * 0.3})`);
+    tealAura.addColorStop(0.6, 'rgba(95, 211, 196, 0.25)');
+    tealAura.addColorStop(1, 'rgba(95, 211, 196, 0)');
+    ctx.fillStyle = tealAura;
+    ctx.beginPath();
+    ctx.arc(harpX, harpY, 28, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sharp, crisp Tide Glow harpoon line embedded in throat
+    ctx.strokeStyle = PALETTE.TideGlow;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(harpX + 32, harpY - 24);
+    ctx.lineTo(harpX - 16, harpY + 14);
+    ctx.stroke();
+
+    // Harpoon barb cross-line
+    ctx.beginPath();
+    ctx.moveTo(harpX - 10, harpY + 6);
+    ctx.lineTo(harpX - 6, harpY + 18);
+    ctx.stroke();
+
+    // 6. Water splash and explosive spray during deck slam
+    if (isSlamming) {
+      ctx.fillStyle = 'rgba(232, 240, 245, 0.75)';
+      for (let s = 0; s < 18; s++) {
+        const splashX = baseX + 180 + Math.sin(s * 1.5) * (40 + s * 8);
+        const splashY = baseY + 30 + Math.cos(s * 2) * (30 + s * 6);
+        ctx.beginPath();
+        ctx.arc(splashX, splashY, 12 + (s % 6), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
     ctx.restore();
   }
@@ -2197,20 +2270,13 @@ export class GameRenderer {
   private drawInteractionPrompt(
     interactable: NonNullable<ReadonlyGameState['activeInteractable']>,
     cameraX: number,
-    cameraY: number
+    cameraY: number,
+    shipTime: number
   ): void {
     const { ctx } = this;
-    const { TILE_SIZE } = CONFIG;
-
-    const baseW = interactable.width ?? 1;
-    const baseH = interactable.height ?? 1;
-    const bounds = interactable.highlightSize;
-    const hlW = (bounds?.width ?? (baseW * 0.5)) * TILE_SIZE;
-    const hlOffsetX = (bounds?.offsetX ?? ((baseW - (bounds?.width ?? (baseW * 0.5))) / 2)) * TILE_SIZE;
-    const hlOffsetY = (bounds?.offsetY ?? ((baseH - (bounds?.height ?? (baseH * 0.5))) / 2)) * TILE_SIZE;
-
-    const screenX = (interactable.x * TILE_SIZE + hlOffsetX + hlW / 2) - cameraX;
-    const screenY = (interactable.y * TILE_SIZE + hlOffsetY) - cameraY - 14;
+    const bounds = getInteractableScreenBounds(interactable, shipTime, cameraX, cameraY);
+    const screenX = bounds.headX;
+    const screenY = bounds.headY - 14;
 
     ctx.save();
     ctx.textAlign = 'center';

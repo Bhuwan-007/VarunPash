@@ -530,6 +530,104 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
               >
                 Trigger ending_hero
               </button>
+              <button
+                id="btn-dev-trigger-coward"
+                onClick={() => {
+                  useMemoryStore.getState().recordEnding('coward');
+                  useUIStore.getState().playCutscene('ending_coward', () => {
+                    useUIStore.getState().setGameScreen('title');
+                  });
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: 'rgba(178, 58, 58, 0.2)',
+                  color: PALETTE.BloodRust,
+                  border: `1px solid ${PALETTE.BloodRust}`,
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+              >
+                Trigger ending_coward
+              </button>
+              <button
+                id="btn-dev-trigger-mutineer"
+                onClick={() => {
+                  useMemoryStore.getState().recordEnding('mutineer');
+                  useUIStore.getState().playCutscene('ending_mutineer', () => {
+                    useUIStore.getState().setGameScreen('title');
+                  });
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: 'rgba(242, 165, 65, 0.2)',
+                  color: PALETTE.Lantern,
+                  border: `1px solid ${PALETTE.Lantern}`,
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+              >
+                Trigger ending_mutineer
+              </button>
+              <button
+                id="btn-dev-trigger-drowned"
+                onClick={() => {
+                  useMemoryStore.getState().recordEnding('drowned');
+                  useUIStore.getState().playCutscene('ending_drowned', () => {
+                    useUIStore.getState().setGameScreen('title');
+                  });
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: 'rgba(95, 211, 196, 0.2)',
+                  color: PALETTE.TideGlow,
+                  border: `1px solid ${PALETTE.TideGlow}`,
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+              >
+                Trigger ending_drowned
+              </button>
+              <button
+                id="btn-dev-set-death-19"
+                onClick={() => {
+                  useMemoryStore.setState({ deathCount: 19 });
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: PALETTE.Deepwater,
+                  color: PALETTE.Bone,
+                  border: '1px solid #1a4253',
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                Set DeathCount=19
+              </button>
+              <button
+                id="btn-dev-neutralize-hari"
+                onClick={() => {
+                  const curr = useLoopStore.getState().hariNeutralized;
+                  useLoopStore.getState().setHariNeutralized(!curr);
+                }}
+                style={{
+                  padding: '5px 4px',
+                  backgroundColor: PALETTE.Deepwater,
+                  color: PALETTE.TideGlow,
+                  border: `1px solid ${PALETTE.TideGlow}`,
+                  borderRadius: '2px',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                Toggle Hari Neutralized
+              </button>
             </div>
           </div>
 

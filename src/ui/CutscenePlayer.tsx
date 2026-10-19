@@ -26,12 +26,14 @@ export const CutscenePlayer: React.FC = () => {
 
   const activeCutsceneRef = useRef(activeCutscene);
   activeCutsceneRef.current = activeCutscene;
+  const mountTimeRef = useRef<number>(Date.now());
 
   // Reset when cutscene changes
   useEffect(() => {
     if (activeCutscene) {
       setPanelIndex(0);
       setImageError(false);
+      mountTimeRef.current = Date.now();
     }
   }, [activeCutscene?.id]);
 
@@ -66,6 +68,11 @@ export const CutscenePlayer: React.FC = () => {
 
   // Handle advancing & skipping
   const handleAdvance = () => {
+    // 250ms grace period on mount prevents accidental skip from holding interaction keys
+    if (Date.now() - mountTimeRef.current < 250) {
+      return;
+    }
+
     if (!def) {
       closeCutscene();
       return;
@@ -94,7 +101,7 @@ export const CutscenePlayer: React.FC = () => {
         e.preventDefault();
         e.stopPropagation();
         closeCutscene();
-      } else if (e.key === ' ' || e.code === 'Space' || e.key === 'e' || e.key === 'E') {
+      } else if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         e.stopPropagation();
         handleAdvance();
@@ -154,7 +161,7 @@ export const CutscenePlayer: React.FC = () => {
             animation: 'pulse 2s infinite',
           }}
         >
-          [Press SPACE or E to continue]
+          [Press SPACE to continue]
         </div>
       </div>
     );
@@ -241,7 +248,7 @@ export const CutscenePlayer: React.FC = () => {
           letterSpacing: '1px',
         }}
       >
-        <span>[SPACE / E] Next</span>
+        <span>[SPACE] Next</span>
         <span>[ESC] Skip</span>
       </div>
     </div>

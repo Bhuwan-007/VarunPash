@@ -52,6 +52,7 @@
         "timeMin": 0,
         "timeMax": 359
       },
+      "once": true,
       "priority": 25,
       "journalNote": "Isha feels the Kaal Mani humming through the ship's timbers beneath the hold hatch."
     },
@@ -59,53 +60,120 @@
       "id": "isha_helm_coordination",
       "text": "If we come about hard to port, I can bring all four cannons to bear on the monster. But someone has to hold the helm plate steady.",
       "when": {
-        "timeMin": 360,
-        "timeMax": 479,
-        "flags": ["K_MUTINEER"]
+        "flags": ["K_Makara_WEAKNESS"],
+        "minLoop": 2
       },
+      "once": true,
       "priority": 35,
-      "journalNote": "Isha says she can drive off the Leviathan if the helm plate is held steady while she fires."
+      "journalNote": "Isha needs the ship turned hard to port to expose the Makara's harpoon wound to her cannons."
     },
     {
       "id": "isha_role_navigator",
-      "text": "Keep her steady into the wind, Navigator. If you give me a level deck, my guns will tear anything out of the water.",
+      "text": "Navigator, give me clean firing lines. Steer us into the swell, not across it. I need this deck level when the beast surfaces.",
       "when": {
         "role": "navigator"
       },
+      "once": true,
       "priority": 45,
-      "journalNote": "Isha needs the Navigator to keep the ship level so her port cannons can hold their aim."
+      "journalNote": "Isha asked the Navigator to keep the ship level in the heavy swell."
     },
     {
       "id": "isha_role_quartermaster",
-      "text": "Quartermaster, don't skimp on my powder measures. When the sea starts boiling, I don't want damp cartridges in my magazines.",
+      "text": "Quartermaster. I need dry powder kegs and slow matches, not another inventory lecture. Deliver the goods or man the guns yourself.",
       "when": {
         "role": "quartermaster"
       },
+      "once": true,
       "priority": 45,
-      "journalNote": "Isha bluntly demanded full dry powder rations from the Quartermaster."
+      "journalNote": "Isha demanded more powder kegs and slow matches from the Quartermaster."
     },
     {
       "id": "isha_role_deckhand",
-      "text": "Clear the recoil tracks, deckhand! One step wrong when the 18-pounder kicks and you're pulp.",
+      "text": "You! Haul that water tub closer to gun four. And if sparks fly, pour it on the cartridge, not your boots.",
       "when": {
         "role": "deckhand"
       },
+      "once": true,
       "priority": 45,
-      "journalNote": "Isha barked at me to mind the gun tackle. A stern warning about cannon recoil."
+      "journalNote": "Isha ordered me to haul water tubs and keep fire off the powder deck."
     },
     {
-      "id": "isha_react_makara",
-      "text": "You keep scanning the port water like you're tracking a shadow. My guns are primed for whatever surfaces.",
-      "requires": ["K_Makara_WEAKNESS"],
-      "priority": 50,
-      "journalNote": "Isha noticed my attention on the port swells, readying her guns."
+      "id": "isha_escalate_2",
+      "text": "I spoke my piece. Clear the battery.",
+      "talkCountMin": 2,
+      "priority": 15
     },
     {
-      "id": "isha_react_chant",
-      "text": "There's a strange chime vibrating in the planking... almost sounds like chanting from the deep.",
-      "requires": ["K_CHANT"],
-      "priority": 50,
-      "journalNote": "Isha felt the humming resonance in the ship's timbers."
+      "id": "isha_escalate_3",
+      "text": "Gun captains don't repeat themselves, sailor. Move along.",
+      "talkCountMin": 3,
+      "priority": 18
+    },
+    {
+      "id": "isha_escalate_4",
+      "text": "Hover near my cannons again and I'll use your skull to ram the powder.",
+      "talkCountMin": 4,
+      "priority": 22
+    },
+    {
+      "id": "isha_flavor_1",
+      "text": "Four twelve-pounders, oiled and ready. But iron only bites what it can see.",
+      "priority": 5
+    },
+    {
+      "id": "isha_flavor_2",
+      "text": "I can smell the sulfur from the hold all the way up here on the gun deck.",
+      "priority": 5
+    },
+    {
+      "id": "isha_flavor_3",
+      "text": "Thorne gave the orders, but the sea doesn't care about rank or commissions.",
+      "priority": 5
+    },
+    {
+      "id": "isha_flavor_4",
+      "text": "The wind died an hour ago, yet the sails are straining. Something is pulling us.",
+      "priority": 5
+    },
+    {
+      "id": "isha_flavor_5",
+      "text": "Keep clear of the recoil ropes. If the monster hits the hull, these guns will dance.",
+      "priority": 5
+    },
+    {
+      "id": "isha_flavor_6",
+      "text": "I've fired into Spanish galleons and pirate sloops. Never fired at a mountain of black scale.",
+      "priority": 5
+    },
+    {
+      "id": "isha_flavor_7",
+      "text": "If you're going below, check the powder room vents. I don't want water in the barrels.",
+      "priority": 5
+    },
+    {
+      "id": "isha_flavor_8",
+      "text": "The sea's turned dark as pitch. Not even the moon leaves a reflection on this water.",
+      "priority": 5
+    },
+    {
+      "id": "isha_flavor_9",
+      "text": "My grandfather was a gunner out of Calicut. He told stories of the Makara—I thought they were fables.",
+      "priority": 5
+    },
+    {
+      "id": "isha_flavor_10",
+      "text": "Keep your head down if the firing starts. Grape shot doesn't care whose sash you wear.",
+      "priority": 5
+    },
+    {
+      "id": "isha_flavor_11",
+      "text": "A cannonball travels sixty fathom a second. The Makara moves faster.",
+      "priority": 5
+    },
+    {
+      "id": "isha_flavor_12",
+      "text": "Check the priming wire in your teeth. When steel strikes flint, don't blink.",
+      "priority": 5
     }
   ]
 }

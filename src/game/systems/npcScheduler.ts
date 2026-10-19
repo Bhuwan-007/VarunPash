@@ -13,6 +13,7 @@ export interface NpcScheduleState {
   activity: string;
   isDead: boolean;
   walkFrame: number;
+  idleAction?: 'stir_pot' | 'wipe_cannon' | 'coil_rope' | 'glance_cabin' | 'tap_helm' | 'talking' | 'idle';
 }
 
 export interface MutineerSilhouette {
@@ -419,6 +420,35 @@ export class NpcScheduler {
     }
   }
 
+  private static getWaypointPause(id: string, wpIdx: number): number {
+    let hash = 0;
+    for (let c = 0; c < id.length; c++) {
+      hash = (hash * 31 + id.charCodeAt(c)) | 0;
+    }
+    // Seeded deterministic pause: 1.2s to 2.8s
+    return 1.2 + Math.abs((hash + wpIdx * 13) % 17) / 10;
+  }
+
+  private static getDeterministicIdle(id: string, activity: string, scene: 'deck' | 'hold'): NpcScheduleState['idleAction'] {
+    if (activity === 'meeting_mutineers' || activity === 'talking_with_crew') {
+      return 'talking';
+    }
+    switch (id) {
+      case 'bhima':
+        return activity === 'cooking' || scene === 'deck' ? 'stir_pot' : 'idle';
+      case 'isha':
+        return activity === 'at_cannons' || activity === 'firing_broadside' ? 'wipe_cannon' : 'idle';
+      case 'hari':
+        return activity === 'guarding_lifeboats' ? 'coil_rope' : 'idle';
+      case 'kedar':
+        return activity === 'patrolling_deck' || activity === 'confronting_nakhuda' ? 'glance_cabin' : 'idle';
+      case 'nakhuda':
+        return activity === 'at_helm' || activity === 'commanding_wheel' ? 'tap_helm' : 'idle';
+      default:
+        return 'idle';
+    }
+  }
+
   private static interpolateWaypoints(
     id: string,
     name: string,
@@ -440,8 +470,14 @@ export class NpcScheduler {
         const cur = waypoints[i];
         const next = waypoints[i + 1];
 
-        const x = cur.x + (next.x - cur.x) * t;
-        const y = cur.y + (next.y - cur.y) * t;
+        // Apply waypoint pause window
+        const pauseDuration = this.getWaypointPause(id, i);
+        const isPausedAtWaypoint = (t < 0.08 || t > 0.92) && (time % (pauseDuration + 2.0)) < pauseDuration;
+
+        const effectiveT = isPausedAtWaypoint ? (t < 0.5 ? 0 : 1) : t;
+
+        const x = cur.x + (next.x - cur.x) * effectiveT;
+        const y = cur.y + (next.y - cur.y) * effectiveT;
 
         const dx = next.x - cur.x;
         const dy = next.y - cur.y;
@@ -453,6 +489,9 @@ export class NpcScheduler {
           facing = dy > 0 ? 'down' : 'up';
         }
 
+        const isMoving = !isPausedAtWaypoint && t > 0.01 && t < 0.99;
+        const idleAction = !isMoving ? this.getDeterministicIdle(id, activity, scene) : 'idle';
+
         return {
           id,
           name,
@@ -461,10 +500,11 @@ export class NpcScheduler {
           x: Math.round(x * 100) / 100,
           y: Math.round(y * 100) / 100,
           facing,
-          isMoving: t > 0.001 && t < 0.999,
+          isMoving,
           activity,
           isDead,
           walkFrame: time * 4,
+          idleAction,
         };
       }
       accumulated += segDist;
@@ -483,15 +523,32 @@ export class NpcScheduler {
       activity,
       isDead,
       walkFrame: 0,
+      idleAction: this.getDeterministicIdle(id, activity, scene),
     };
   }
 
-  public static getAllNpcStates(shipTime: number): NpcScheduleState[] {
+  public static getAllNpcStates(
+    shipTime: number,
+    playerPos?: { x: number; y: number; scene?: 'deck' | 'hold' }
+  ): NpcScheduleState[] {
     const ids = Object.keys(ALL_SCHEDULES);
     const list: NpcScheduleState[] = [];
     for (const id of ids) {
       const state = this.getNpcState(id, shipTime);
       if (state) {
+        // NPCs face the player when within 3 tiles (Item C)
+        if (playerPos && playerPos.scene === state.scene && !state.isDead) {
+          const dist = Math.hypot(playerPos.x - state.x, playerPos.y - state.y);
+          if (dist <= 3.0) {
+            const dx = playerPos.x - state.x;
+            const dy = playerPos.y - state.y;
+            if (Math.abs(dx) > Math.abs(dy)) {
+              state.facing = dx > 0 ? 'right' : 'left';
+            } else {
+              state.facing = dy > 0 ? 'down' : 'up';
+            }
+          }
+        }
         list.push(state);
       }
     }

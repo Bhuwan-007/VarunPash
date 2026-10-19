@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { CONFIG, PALETTE } from '../config';
+import { getNextLead } from '../data/journalEntries';
 import { useMemoryStore } from '../store/memoryStore';
 import { useUIStore } from '../store/uiStore';
 
@@ -106,6 +107,31 @@ export const DeathToast: React.FC<DeathToastProps> = ({ onRespawn }) => {
             </div>
           )}
         </div>
+
+        {/* Dynamic Next Lead under death toast */}
+        {(() => {
+          const knowledge = useMemoryStore.getState().knowledge;
+          const lead = getNextLead(knowledge);
+          return (
+            <div
+              style={{
+                fontSize: '14px',
+                color: PALETTE.Lantern,
+                marginBottom: '20px',
+                padding: '8px 14px',
+                backgroundColor: 'rgba(242, 165, 65, 0.08)',
+                border: '1px solid rgba(242, 165, 65, 0.3)',
+                borderRadius: '4px',
+                fontStyle: 'italic',
+              }}
+            >
+              <span style={{ fontWeight: 'bold', color: PALETTE.Bone, fontStyle: 'normal' }}>
+                {lead.title}:{' '}
+              </span>
+              "{lead.hint}"
+            </div>
+          );
+        })()}
 
         {/* Respawn Shift Stats */}
         <div style={{ fontSize: '13px', color: PALETTE.Ash, marginBottom: '32px' }}>

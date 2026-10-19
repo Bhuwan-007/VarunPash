@@ -10,7 +10,8 @@
         "minLoop": 4,
         "flags": ["K_MUTINEER"]
       },
-      "priority": 60,
+      "once": true,
+      "priority": 58,
       "journalNote": "Kedar recognizes me across the loops. His smirk broke into cold, creeping dread."
     },
     {
@@ -62,6 +63,7 @@
         "timeMin": 0,
         "timeMax": 359
       },
+      "once": true,
       "priority": 25,
       "journalNote": "Kedar cares only for the hold's locked gold. A purse might stay his blade."
     },
@@ -71,6 +73,7 @@
       "when": {
         "role": "navigator"
       },
+      "once": true,
       "priority": 45,
       "journalNote": "Kedar spoke with smooth, measured politeness. He wants the Navigator alive to steer the ship after the mutiny."
     },
@@ -80,6 +83,7 @@
       "when": {
         "role": "quartermaster"
       },
+      "once": true,
       "priority": 45,
       "journalNote": "Kedar warned me away with cold suspicion. He watches the Quartermaster like a hawk."
     },
@@ -89,22 +93,110 @@
       "when": {
         "role": "deckhand"
       },
+      "once": true,
       "priority": 45,
       "journalNote": "Kedar waved me away without looking up. To him, a deckhand is just grease on the deck."
     },
     {
-      "id": "kedar_react_mutineer",
-      "text": "You look at me like you know something.",
+      "id": "kedar_ally_offer",
+      "text": "You know what's coming at the sixth bell. Stand with me when Thorne falls, and you'll have your share. My cannons will deal with whatever rises from the deep.",
+      "when": {
+        "timeMax": 359,
+        "notFlags": ["K_ALLIED_KEDAR"]
+      },
       "requires": ["K_MUTINEER"],
-      "priority": 50,
-      "journalNote": "Kedar eyed me sharply, wondering how much I've pieced together."
+      "grants": ["K_ALLIED_KEDAR"],
+      "priority": 65,
+      "once": true,
+      "journalNote": "I agreed to stand with Kedar. When the sixth bell strikes and Thorne falls, his cannons will fire on the beast."
     },
     {
-      "id": "kedar_react_safe_code",
-      "text": "The old man and his iron box... some fools think numbers will keep their throats dry.",
-      "requires": ["K_SAFE_CODE"],
-      "priority": 50,
-      "journalNote": "Kedar scoffed at the Captain's safe and locks."
+      "id": "kedar_allied_standby",
+      "text": "Keep your head down until the sixth bell. When Thorne drops, we take the guns.",
+      "when": {
+        "timeMax": 359,
+        "flags": ["K_ALLIED_KEDAR"]
+      },
+      "priority": 62,
+      "journalNote": "Kedar signaled for me to stay calm until Thorne is struck down."
+    },
+    {
+      "id": "kedar_escalate_2",
+      "text": "I gave you your answer. Don't crowd my shoulder.",
+      "talkCountMin": 2,
+      "priority": 15
+    },
+    {
+      "id": "kedar_escalate_3",
+      "text": "Twice is curiosity. A third time is a challenge. Watch your step, sailor.",
+      "talkCountMin": 3,
+      "priority": 18
+    },
+    {
+      "id": "kedar_escalate_4",
+      "text": "One more word, swab, and you won't live to hear the sixth bell strike.",
+      "talkCountMin": 4,
+      "priority": 22
+    },
+    {
+      "id": "kedar_flavor_1",
+      "text": "The sea has a way of sorting out fools from men with resolve.",
+      "priority": 5
+    },
+    {
+      "id": "kedar_flavor_2",
+      "text": "Thorne thinks an iron door keeps out a changing tide. He is mistaken.",
+      "priority": 5
+    },
+    {
+      "id": "kedar_flavor_3",
+      "text": "Every minute we drift, the cargo below drinks more of our time. You feel it too, don't you?",
+      "priority": 5
+    },
+    {
+      "id": "kedar_flavor_4",
+      "text": "A wise sailor doesn't ask who owns the gold until the storm has passed.",
+      "priority": 5
+    },
+    {
+      "id": "kedar_flavor_5",
+      "text": "You walk with a strange certainty for a common hand. What do you see in the dark?",
+      "priority": 5
+    },
+    {
+      "id": "kedar_flavor_6",
+      "text": "The cannons on the port rail are loaded with double grape. We won't die without a bite.",
+      "priority": 5
+    },
+    {
+      "id": "kedar_flavor_7",
+      "text": "Keep your eyes on the horizon. When the stars blur, the bell is close.",
+      "priority": 5
+    },
+    {
+      "id": "kedar_flavor_8",
+      "text": "Loyalty is just ink on paper. Steel is what settles the ledger.",
+      "priority": 5
+    },
+    {
+      "id": "kedar_flavor_9",
+      "text": "I hear the bilge rattling. Someone is whispering in the iron pipes.",
+      "priority": 5
+    },
+    {
+      "id": "kedar_flavor_10",
+      "text": "Watch the water line, sailor. We're riding two inches lower than we were an hour ago.",
+      "priority": 5
+    },
+    {
+      "id": "kedar_flavor_11",
+      "text": "Men pray when they drown. I prefer to aim where the monster bleeds.",
+      "priority": 5
+    },
+    {
+      "id": "kedar_flavor_12",
+      "text": "The Nakhuda counts his days like pearls. Soon the string snaps.",
+      "priority": 5
     }
   ]
 }

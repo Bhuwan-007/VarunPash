@@ -26,6 +26,11 @@ export const MangaPage: React.FC<MangaPageProps> = ({
   const currentPage = def?.pages[pageIndex];
   const totalPanelsOnPage = currentPage?.panels.length ?? 0;
 
+  const mountTimeRef = useRef<number>(Date.now());
+  useEffect(() => {
+    mountTimeRef.current = Date.now();
+  }, [cutsceneId]);
+
   // Trigger impact effects (screen shake + white flash)
   const triggerImpact = useCallback(() => {
     setIsShaking(true);
@@ -36,6 +41,11 @@ export const MangaPage: React.FC<MangaPageProps> = ({
 
   // Advance beat
   const advance = useCallback(() => {
+    // 250ms grace period on mount prevents accidental skip from holding interaction keys
+    if (Date.now() - mountTimeRef.current < 250) {
+      return;
+    }
+
     if (!def) {
       onComplete?.();
       return;
@@ -93,13 +103,7 @@ export const MangaPage: React.FC<MangaPageProps> = ({
         e.preventDefault();
         e.stopPropagation();
         handleSkip();
-      } else if (
-        e.key === ' ' ||
-        e.code === 'Space' ||
-        e.key === 'e' ||
-        e.key === 'E' ||
-        e.key === 'Enter'
-      ) {
+      } else if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         e.stopPropagation();
         advance();
@@ -395,7 +399,7 @@ export const MangaPage: React.FC<MangaPageProps> = ({
             zIndex: 85,
           }}
         >
-          [SPACE / E / CLICK] Next • [ESC] Skip
+          [SPACE / CLICK] Next • [ESC] Skip
         </div>
       </div>
     </div>

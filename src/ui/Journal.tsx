@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PALETTE } from '../config';
-import { JournalTab, NPC_PROFILE_CARDS, PINNED_OBJECTIVE } from '../data/journalEntries';
+import { getNextLead, JournalTab, NPC_PROFILE_CARDS, PINNED_OBJECTIVE } from '../data/journalEntries';
 import { useMemoryStore } from '../store/memoryStore';
 import { useUIStore } from '../store/uiStore';
 
@@ -283,6 +283,26 @@ export const Journal: React.FC = () => {
                   >
                     "{PINNED_OBJECTIVE}"
                   </div>
+
+                  {/* Dynamic Next Lead Banner */}
+                  {(() => {
+                    const lead = getNextLead(knowledge);
+                    return (
+                      <div
+                        style={{
+                          marginTop: '10px',
+                          paddingTop: '8px',
+                          borderTop: '1px dashed #3d8c83',
+                          fontSize: '17px',
+                          color: '#422817',
+                          fontStyle: 'italic',
+                        }}
+                      >
+                        <strong style={{ color: '#165c52', fontStyle: 'normal' }}>{lead.title}: </strong>
+                        "{lead.hint}"
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Clues entries list */}

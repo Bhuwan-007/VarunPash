@@ -51,6 +51,7 @@
         "timeMin": 0,
         "timeMax": 359
       },
+      "once": true,
       "priority": 25,
       "journalNote": "Hari named his price: one gold coin from the captain's chest to launch the escape cutter."
     },
@@ -58,54 +59,121 @@
       "id": "hari_locket_hint",
       "text": "Saw something shining near the capstan. Silver locket. Left it alone. Dead men's trinkets bring bad water.",
       "when": {
-        "flags": ["K_BHIMA_GOSSIP"],
         "timeMin": 0,
-        "timeMax": 359
+        "timeMax": 360
       },
-      "priority": 22,
-      "grants": ["CLUE_LOCKET"],
-      "journalNote": "Hari saw a silver locket dropped near the capstan. Refused to touch it for fear of ill luck."
+      "once": true,
+      "priority": 15,
+      "grants": ["CLUE_LOCKET_SEEN"],
+      "journalNote": "Hari mentioned a silver locket lying on the deck near the main capstan."
     },
     {
       "id": "hari_role_quartermaster",
-      "text": "Quartermaster. Your keys can open any locker, but only cold silver unlocks these lifeboat davits. Remember who holds the falls.",
+      "text": "Quartermaster. Six silver sovereigns in your pouch, right? Drop three in my palm and you'll find this boat unlashed when you need it.",
       "when": {
         "role": "quartermaster"
       },
+      "once": true,
       "priority": 45,
-      "journalNote": "Hari eyed my belt with greedy respect. Coin is the only language he listens to."
+      "journalNote": "Hari knows the Quartermaster has coin and openly offered a deal for lifeboat access."
     },
     {
       "id": "hari_role_navigator",
-      "text": "Charts won't float when the timbers crack, Navigator. Point us toward dry land, or we'll all be feeding the bottom.",
+      "text": "Navigator, if this tub cracks in half, you'd better know which star points to shallow reef. Lifeboats don't sail themselves.",
       "when": {
         "role": "navigator"
       },
+      "once": true,
       "priority": 45,
-      "journalNote": "Hari grumbled at the Navigator, anxious for charts that lead to solid ground."
+      "journalNote": "Hari warned the Navigator that charts mean nothing without an open sea."
     },
     {
       "id": "hari_role_deckhand",
-      "text": "Move along, deckhand. Lifeboats are for men who pull their weight. You go over the side with the rats.",
+      "text": "Step away from the gunwale, rat. You don't have the coin to look at these oars.",
       "when": {
         "role": "deckhand"
       },
+      "once": true,
       "priority": 45,
-      "journalNote": "Hari shoved me aside. He treats deckhands as expendable ballast."
+      "journalNote": "Hari shoved me back from the lifeboats with a grunt of contempt."
     },
     {
-      "id": "hari_react_mutineer",
-      "text": "Keep quiet and look to your own business. The wind is shifting, and words can get a throat cut.",
-      "requires": ["K_MUTINEER"],
-      "priority": 50,
-      "journalNote": "Hari warns me that the tension on deck is ready to boil over."
+      "id": "hari_escalate_2",
+      "text": "You heard me the first time. Keep moving.",
+      "talkCountMin": 2,
+      "priority": 15
     },
     {
-      "id": "hari_react_omen_gull",
-      "text": "You heard that bird on the spar too, eh? Three cries means nobody gets an easy night on the Jal-Doot.",
-      "requires": ["K_OMEN_GULL"],
-      "priority": 50,
-      "journalNote": "Hari recognized the three cries of the gull as an omen of ill fortune."
+      "id": "hari_escalate_3",
+      "text": "I'm not here for idle chatter, swab. The cutter stays lashed.",
+      "talkCountMin": 3,
+      "priority": 18
+    },
+    {
+      "id": "hari_escalate_4",
+      "text": "Beat it before I take a belaying pin to your ribs.",
+      "talkCountMin": 4,
+      "priority": 22
+    },
+    {
+      "id": "hari_flavor_1",
+      "text": "Ropes don't lie. When the hemp frays this fast, the sea's hungry.",
+      "priority": 5
+    },
+    {
+      "id": "hari_flavor_2",
+      "text": "A lifeboat is six planks between you and the abyss. Don't look at it unless you can pay.",
+      "priority": 5
+    },
+    {
+      "id": "hari_flavor_3",
+      "text": "I don't trust the calm. The sea always smiles sweetest right before she snaps.",
+      "priority": 5
+    },
+    {
+      "id": "hari_flavor_4",
+      "text": "The davits are greased, but the winch is stiff. Takes iron will to lower them into this swell.",
+      "priority": 5
+    },
+    {
+      "id": "hari_flavor_5",
+      "text": "Gold doesn't drown. Men do. Remember that if the timbers start groaning.",
+      "priority": 5
+    },
+    {
+      "id": "hari_flavor_6",
+      "text": "I've seen mutinies before. They always end with red water and empty hammocks.",
+      "priority": 5
+    },
+    {
+      "id": "hari_flavor_7",
+      "text": "Keep your hands off the lanyards. One false knot and the boat flips on the falls.",
+      "priority": 5
+    },
+    {
+      "id": "hari_flavor_8",
+      "text": "The water smells like dead kelp and copper tonight. Cursed water.",
+      "priority": 5
+    },
+    {
+      "id": "hari_flavor_9",
+      "text": "You've got that look in your eye. Like a man who already knows which wave has his name on it.",
+      "priority": 5
+    },
+    {
+      "id": "hari_flavor_10",
+      "text": "If the ship goes, stay off the rigging. The masts go down first.",
+      "priority": 5
+    },
+    {
+      "id": "hari_flavor_11",
+      "text": "I've coiled rope on twenty vessels. None ever groaned with this tone.",
+      "priority": 5
+    },
+    {
+      "id": "hari_flavor_12",
+      "text": "A marlinspike solves more arguments than a parley. Don't test me.",
+      "priority": 5
     }
   ]
 }

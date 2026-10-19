@@ -83,10 +83,13 @@ export class LoopManager {
 
     uiStore.hideDeathToast();
 
-    // PLACEHOLDER: Currently silently resets game at 20 deaths.
-    // In P8, this placeholder will be replaced with the hidden Drowned Loop ending (four-panel cutscene) before resetting.
+    // P8: The 20th death: respawn would be at 600. Skip gameplay and play the Drowned Loop ending.
     if (memoryState.deathCount >= CONFIG.MAX_DEATHS) {
-      this.fullResetGame();
+      useMemoryStore.getState().recordEnding('drowned');
+      uiStore.playCutscene('ending_drowned', () => {
+        this.fullResetGame();
+        useUIStore.getState().setGameScreen('title');
+      });
       return;
     }
 

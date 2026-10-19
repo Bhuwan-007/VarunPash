@@ -23,6 +23,8 @@ export interface LoopState {
   strongboxWrongAttempts: number;
   hasPickedDeckLocketThisLoop: boolean;
   lifeboatsLaunched: boolean;
+  hariNeutralized: boolean;
+  talkCounts: Record<string, number>;
 
   // Actions
   reset: (startTime?: number, defaultSpawn?: { x: number; y: number }) => void;
@@ -43,6 +45,8 @@ export interface LoopState {
   recordWrongStrongboxAttempt: () => boolean;
   pickDeckLocket: () => void;
   launchLifeboats: () => void;
+  setHariNeutralized: (neutralized: boolean) => void;
+  incrementTalkCount: (npcId: string) => number;
 }
 
 export function getStartingInventoryForRole(role: 'navigator' | 'quartermaster' | 'deckhand' | null | undefined): {
@@ -83,6 +87,8 @@ export const useLoopStore = create<LoopState>((set, get) => ({
   strongboxWrongAttempts: 0,
   hasPickedDeckLocketThisLoop: false,
   lifeboatsLaunched: false,
+  hariNeutralized: false,
+  talkCounts: {},
 
   reset: (startTime?: number, defaultSpawn = { x: 7, y: 10 }) => {
     const targetStartTime =
@@ -101,6 +107,8 @@ export const useLoopStore = create<LoopState>((set, get) => ({
       strongboxWrongAttempts: 0,
       hasPickedDeckLocketThisLoop: false,
       lifeboatsLaunched: false,
+      hariNeutralized: false,
+      talkCounts: {},
       npcStates: {},
       playerPos: defaultSpawn,
       scene: 'deck',
@@ -220,5 +228,21 @@ export const useLoopStore = create<LoopState>((set, get) => ({
       title: 'Boats Away',
       text: 'The boats are away. Now the Kaal Mani.',
     });
+  },
+
+  setHariNeutralized: (neutralized: boolean) => {
+    set({ hariNeutralized: neutralized });
+  },
+
+  incrementTalkCount: (npcId: string) => {
+    const current = get().talkCounts[npcId] ?? 0;
+    const next = current + 1;
+    set((state) => ({
+      talkCounts: {
+        ...state.talkCounts,
+        [npcId]: next,
+      },
+    }));
+    return next;
   },
 }));

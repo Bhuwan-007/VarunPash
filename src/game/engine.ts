@@ -85,6 +85,9 @@ export class GameEngine {
   private dangerTargetId: string | null = null;
   private winchHoldTimer: number = 0;
   private chantHoldTimer: number = 0;
+  private cowardHoldTimer: number = 0;
+  private hariHoldTimer: number = 0;
+  private mutineerEndingTriggered: boolean = false;
   private navigatorKnockIndex: number = 0;
 
   private activeBarks: ActiveBark[] = [];
@@ -154,6 +157,9 @@ export class GameEngine {
         this.dangerTargetId = null;
         this.winchHoldTimer = 0;
         this.chantHoldTimer = 0;
+        this.cowardHoldTimer = 0;
+        this.hariHoldTimer = 0;
+        this.mutineerEndingTriggered = false;
         this.eventScheduler.reset();
 
         this.camera.update(
@@ -264,6 +270,25 @@ export class GameEngine {
     }
     if (shipTime >= 480) {
       triggerMoment('makara');
+
+      // P8 Ending: Mutineer's Reign
+      // RULES.md: K_ALLIED_KEDAR, Nakhuda killed in mutiny, Kedar's cannons repel the Makara
+      if (
+        !this.mutineerEndingTriggered &&
+        useMemoryStore.getState().knowledge.includes('K_ALLIED_KEDAR') &&
+        !useLoopStore.getState().lifeboatsLaunched
+      ) {
+        this.mutineerEndingTriggered = true;
+        playGunshot();
+        this.screenShake.trigger(16, 2.5);
+        this.queueBark('mutineer_repel', 'kedar', 'FIRE THE PORT CANNONS! BLOW THAT DEVIL BACK INTO THE TROUGH!');
+        useMemoryStore.getState().recordEnding('mutineer');
+        useUIStore.getState().playCutscene('ending_mutineer', () => {
+          useUIStore.getState().setGameScreen('title');
+        });
+        this.input.endFrame();
+        return;
+      }
     }
 
     // 3b. Makara telegraph low rumble & screen tremor (470 - 479)
@@ -284,8 +309,8 @@ export class GameEngine {
         return;
       }
 
-      // Stand right beside Kedar during mutiny (at or after 360) if not talking
-      if (shipTime >= 360 && !uiState.activeDialogue) {
+      // Stand right beside Kedar during mutiny (at or after 360) if not talking and not allied
+      if (shipTime >= 360 && !uiState.activeDialogue && !useMemoryStore.getState().knowledge.includes('K_ALLIED_KEDAR')) {
         const kedar = NpcScheduler.getNpcState('kedar', shipTime);
         if (kedar && Math.hypot(this.player.x - kedar.x, this.player.y - kedar.y) <= 0.8) {
           addKnowledge('K_MUTINEER');
@@ -408,9 +433,10 @@ export class GameEngine {
         continue;
       }
 
-      const centerX = item.x + (item.width ?? 1) / 2;
-      const centerY = item.y + (item.height ?? 1) / 2;
-      const dist = Math.hypot(this.player.x - centerX, this.player.y - centerY);
+      // Calculate shortest distance to interactable bounding box
+      const clampedX = Math.max(item.x, Math.min(this.player.x, item.x + (item.width ?? 1)));
+      const clampedY = Math.max(item.y, Math.min(this.player.y, item.y + (item.height ?? 1)));
+      const dist = Math.hypot(this.player.x - clampedX, this.player.y - clampedY);
 
       if (dist <= CONFIG.INTERACT_RADIUS && dist < minDistance) {
         // Dynamic labels based on role and shipTime
@@ -433,6 +459,17 @@ export class GameEngine {
         } else if (item.id === 'starboard_winch') {
           const launched = useLoopStore.getState().lifeboatsLaunched;
           label = launched ? 'Davit Winch Plate (Lifeboats Launched)' : 'Lower Lifeboats (Hold E 10s)';
+        } else if (item.id === 'starboard_lifeboat') {
+          const loop = useLoopStore.getState();
+          if (loop.lifeboatsLaunched) {
+            label = 'Starboard Davits (Lifeboats Lowered)';
+          } else if (loop.hariNeutralized && shipTime < 480) {
+            label = "Escape in Lifeboat Alone (Hold E 2s - Coward's End)";
+          } else if (!loop.hariNeutralized) {
+            label = "Starboard Lifeboat (Guarded by Bosun Hari)";
+          } else {
+            label = 'Starboard Lifeboat';
+          }
         } else if (item.id === 'quarterdeck_strongbox') {
           const loopStore = useLoopStore.getState();
           if (loopStore.strongboxJammed) {
@@ -515,6 +552,13 @@ export class GameEngine {
         closest = { ...winchItem, label: 'Lower Lifeboats (Hold E 10s)' };
       }
     }
+    // Keep active interactable locked to starboard_lifeboat while holding lifeboat escape
+    if (this.cowardHoldTimer > 0 && Math.hypot(this.player.x - 14, this.player.y - 12) <= 3.0) {
+      const lifeboatItem = activeMap.interactables.find((i) => i.id === 'starboard_lifeboat');
+      if (lifeboatItem) {
+        closest = { ...lifeboatItem, label: "Escape in Lifeboat Alone (Hold E 2s - Coward's End)" };
+      }
+    }
     this.activeInteractable = closest;
 
     // 7b. Danger Confirmation Hold Check (Hold E for 1.0 second, releasing cancels)
@@ -561,6 +605,8 @@ export class GameEngine {
     // 7b2. Lifeboat Launch Winch Hold (Hold E for 10 seconds, releasing resets)
     const isWinchAction =
       (this.activeInteractable?.id === 'starboard_winch' || (this.winchHoldTimer > 0 && distToWinch <= 2.5)) &&
+      this.activeInteractable?.id !== 'starboard_lifeboat' &&
+      this.cowardHoldTimer === 0 &&
       this.scene === 'deck' &&
       !useLoopStore.getState().lifeboatsLaunched;
 
@@ -611,6 +657,85 @@ export class GameEngine {
       this.chantHoldTimer = 0;
     }
 
+    // 7b4. Coward's End Lifeboat Escape (Hold E for 2.0 seconds while Hari is neutralized before 480s)
+    const distToLifeboat = Math.hypot(this.player.x - 14, this.player.y - 12);
+    const isLifeboatAction =
+      (this.activeInteractable?.id === 'starboard_lifeboat' || (this.cowardHoldTimer > 0 && distToLifeboat <= 3.0)) &&
+      this.scene === 'deck' &&
+      useLoopStore.getState().hariNeutralized &&
+      !useLoopStore.getState().lifeboatsLaunched &&
+      shipTime < 480;
+
+    if (isLifeboatAction && this.input.isActionPressed('interact')) {
+      this.cowardHoldTimer += dt;
+      const remaining = Math.max(0, 2.0 - this.cowardHoldTimer);
+      this.messageBanner = `Rowing away alone... (${remaining.toFixed(1)}s)`;
+      this.messageTimer = 0.3;
+
+      if (this.cowardHoldTimer >= 2.0) {
+        this.cowardHoldTimer = 0;
+        useMemoryStore.getState().recordEnding('coward');
+        useUIStore.getState().playCutscene('ending_coward', () => {
+          useUIStore.getState().setGameScreen('title');
+        });
+        this.input.endFrame();
+        return;
+      }
+    } else {
+      this.cowardHoldTimer = 0;
+    }
+
+    // 7b5. Neutralizing Hari (Hold E for 1.5 seconds)
+    // Quartermaster: fights or pays 3 coins
+    // Navigator: bribes with gold / 3 coins / locket
+    // Deckhand: rattles deck vent/grate near Hari
+    const distToHari = Math.hypot(this.player.x - 11.5, this.player.y - 12.5);
+    const distToGrate = Math.hypot(this.player.x - 7.0, this.player.y - 14.0);
+    const isNearHari = distToHari <= 2.2 || this.activeInteractable?.id === 'npc_hari' || this.activeInteractable?.id === 'starboard_lifeboat';
+    const isDeckhandVentSpot = playerRole === 'deckhand' && (distToGrate <= 2.5 || this.activeInteractable?.id === 'listening_grate');
+
+    const canQuartermasterNeutralize = playerRole === 'quartermaster' && isNearHari && !useLoopStore.getState().hariNeutralized;
+    const canNavigatorNeutralize = playerRole === 'navigator' && isNearHari && !useLoopStore.getState().hariNeutralized && (useLoopStore.getState().inventory.includes('Gold Bar') || useLoopStore.getState().inventory.includes('Silver Locket') || useLoopStore.getState().coins >= 3);
+    const canDeckhandNeutralize = isDeckhandVentSpot && !useLoopStore.getState().hariNeutralized;
+
+    const isHariAction = (canQuartermasterNeutralize || canNavigatorNeutralize || canDeckhandNeutralize) && this.scene === 'deck' && shipTime < 480;
+
+    if (isHariAction && this.input.isActionPressed('interact') && !this.activeInteractable?.id?.startsWith('starboard_winch')) {
+      this.hariHoldTimer += dt;
+      const remaining = Math.max(0, 1.5 - this.hariHoldTimer);
+      if (playerRole === 'deckhand') {
+        this.messageBanner = `Rattling iron vent pipes... (${remaining.toFixed(1)}s)`;
+      } else if (playerRole === 'quartermaster') {
+        this.messageBanner = `Subduing Bosun Hari... (${remaining.toFixed(1)}s)`;
+      } else {
+        this.messageBanner = `Bribing Bosun Hari... (${remaining.toFixed(1)}s)`;
+      }
+      this.messageTimer = 0.3;
+
+      if (this.hariHoldTimer >= 1.5) {
+        this.hariHoldTimer = 0;
+        useLoopStore.getState().setHariNeutralized(true);
+
+        if (playerRole === 'deckhand') {
+          this.messageBanner = "Vent rattled! Hari shouts: 'What devil is scratching in the bilge?!' and stomps away!";
+        } else if (playerRole === 'quartermaster') {
+          if (useLoopStore.getState().coins >= 3) {
+            useLoopStore.getState().spendCoins(3);
+            this.messageBanner = "Paid 3 coins to Hari. He pockets the silver and turns a blind eye to the boat.";
+          } else {
+            playKnifeStab();
+            this.screenShake.trigger(10, 0.4);
+            this.messageBanner = "You strike Hari with a heavy brass marlinspike, knocking him cold on the deck!";
+          }
+        } else {
+          this.messageBanner = "Hari takes the bribe: 'Gold speaks louder than Nakhuda. Take the cutter and vanish.'";
+        }
+        this.messageTimer = 4.0;
+      }
+    } else {
+      this.hariHoldTimer = 0;
+    }
+
     // 7c. Continuous Deckhand Eavesdropping timer (Hold E for 3 seconds between 310 and 335s)
     const isEavesdroppingSpot =
       playerRole === 'deckhand' &&
@@ -632,10 +757,11 @@ export class GameEngine {
           id: 'clue_deckhand_eavesdrop',
           tab: 'Clues',
           title: 'Mutiny in the Hold',
-          text: 'Pressed against the iron grate, I heard Kedar whispering with his cutthroats. The mutiny is set for the sixth bell (360s). They plan to strike Thorne down in his quarters.',
+          text: 'Pressed against the iron grate, I heard Kedar whispering with his cutthroats: "At the sixth bell (360s), Thorne bleeds. The Jal-Doot belongs to us!"',
         });
-        this.messageBanner = "Overheard Kedar's plot: Mutiny set for 360s!";
-        this.messageTimer = 4.0;
+        useUIStore.getState().triggerJournalPulse();
+        this.messageBanner = "Overheard Kedar: 'At 360s, Thorne falls! The ship is ours.' (Clue recorded in Journal [J])";
+        this.messageTimer = 6.0;
       }
     } else {
       this.eavesdropHoldTimer = 0;
@@ -771,6 +897,65 @@ export class GameEngine {
         this.messageBanner = 'Hold [E] for 10 seconds to lower the lifeboats.';
       }
       this.messageTimer = 3.0;
+      return;
+    }
+
+    // 2b2. Starboard Lifeboat (Coward's End Option)
+    if (interactable.id === 'starboard_lifeboat') {
+      const launched = useLoopStore.getState().lifeboatsLaunched;
+      if (launched) {
+        this.messageBanner = 'The lifeboats have already been lowered and sailed away.';
+        this.messageTimer = 3.0;
+        return;
+      }
+
+      if (shipTime >= 480) {
+        this.messageBanner = 'Too late! The Makara is tearing through the hull!';
+        this.messageTimer = 3.0;
+        return;
+      }
+
+      const hariNeutralized = useLoopStore.getState().hariNeutralized;
+      if (!hariNeutralized) {
+        if (playerRole === 'quartermaster') {
+          this.messageBanner = 'Hari blocks the lifeboat. Hold [E] for 1.5s to strike or pay 3 coins.';
+        } else if (playerRole === 'navigator') {
+          const hasGold =
+            useLoopStore.getState().inventory.includes('Gold Bar') ||
+            useLoopStore.getState().inventory.includes('Silver Locket') ||
+            useLoopStore.getState().coins >= 3;
+          if (hasGold) {
+            this.messageBanner = 'Hari blocks the lifeboat. Hold [E] for 1.5s to bribe him with gold.';
+          } else {
+            this.messageBanner = "Hari blocks the lifeboat: 'Bring me hold gold or 3 coins if you want a boat!'";
+          }
+        } else {
+          this.messageBanner = "Hari blocks the lifeboat: 'Beat it, rat!' (Hint: Hold [E] at the deck listening grate to lure him away).";
+        }
+        this.messageTimer = 3.5;
+        return;
+      }
+
+      this.messageBanner = "Hold [E] for 2 seconds to board the lifeboat and escape alone (Coward's End).";
+      this.messageTimer = 3.5;
+      return;
+    }
+
+    // 2b3. Locked Chest of Hold Gold
+    if (interactable.id === 'hold_gold_chest') {
+      const loop = useLoopStore.getState();
+      const hasHoldKey = loop.inventory.includes('Hold Key') || playerRole === 'quartermaster';
+      if (hasHoldKey) {
+        if (loop.inventory.includes('Gold Bar')) {
+          this.messageBanner = 'The chest has already been cleaned out of gold.';
+        } else {
+          loop.addItem('Gold Bar');
+          this.messageBanner = 'Unlocked the iron chest and seized a heavy contraband Gold Bar!';
+        }
+      } else {
+        this.messageBanner = 'A heavy iron-banded chest. Locked tight with a naval ward lock (Needs Hold Key).';
+      }
+      this.messageTimer = 3.5;
       return;
     }
 
@@ -1057,7 +1242,25 @@ export class GameEngine {
   }
 
   private getEvacuatingNpcStates(shipTime: number): NpcScheduleState[] {
-    const rawNpcs = NpcScheduler.getAllNpcStates(shipTime);
+    const rawNpcs = NpcScheduler.getAllNpcStates(shipTime, {
+      x: this.player.x,
+      y: this.player.y,
+      scene: this.scene,
+    });
+
+    // Mutineer barks when player is near (Item D)
+    const mutineers = NpcScheduler.getMutineers(shipTime);
+    for (const m of mutineers) {
+      if (m.scene === this.scene) {
+        const dist = Math.hypot(this.player.x - m.x, this.player.y - m.y);
+        if (dist <= 2.5) {
+          const mutineerBarks = ['For Kedar!', 'Back off, sailor.', 'Keep moving, swab!'];
+          const barkText = mutineerBarks[Math.floor(shipTime / 6) % mutineerBarks.length];
+          this.queueBark(`mutineer_${m.id}_${Math.floor(shipTime / 6)}`, m.id, barkText);
+        }
+      }
+    }
+
     const lifeboatsLaunched = useLoopStore.getState().lifeboatsLaunched;
     const isWinchHolding = this.winchHoldTimer > 0 && !lifeboatsLaunched;
     const winchProgress = Math.min(1.0, this.winchHoldTimer / 10.0);
