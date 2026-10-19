@@ -27,7 +27,8 @@ export class AssetLoader {
       img.onerror = () => {
         this.failedSet.add(def.id);
       };
-      img.src = def.path;
+      const cleanPath = def.path.startsWith('/') ? def.path.slice(1) : def.path;
+      img.src = `${import.meta.env.BASE_URL}${cleanPath}`;
     }
   }
 

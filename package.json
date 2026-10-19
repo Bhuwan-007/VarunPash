@@ -10,7 +10,9 @@
     "zip": "tar -a -c -f varunpash-itch.zip -C dist ."
   },
   "dependencies": {
+    "@fontsource/bangers": "^5.3.0",
     "@fontsource/caveat": "^5.3.0",
+    "@fontsource/comic-neue": "^5.3.0",
     "@fontsource/im-fell-english-sc": "^5.3.0",
     "@fontsource/pixelify-sans": "^5.3.0",
     "@fontsource/special-elite": "^5.3.0",
@@ -22,6 +24,7 @@
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "sharp": "^0.35.5",
     "typescript": "^5.5.3",
     "vite": "^5.4.2"
   }

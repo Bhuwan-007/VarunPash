@@ -1,10 +1,23 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { CINEMATICS, CinematicDef } from '../data/cinematics';
+import { MANGA_CUTSCENES } from '../data/mangaIntro';
 import { useUIStore } from '../store/uiStore';
+import { MangaPage } from './MangaPage';
 
 export const CutscenePlayer: React.FC = () => {
   const activeCutscene = useUIStore((s) => s.activeCutscene);
   const closeCutscene = useUIStore((s) => s.closeCutscene);
+
+  if (activeCutscene && MANGA_CUTSCENES[activeCutscene.id]) {
+    return (
+      <MangaPage
+        cutsceneId={activeCutscene.id}
+        onComplete={() => {
+          closeCutscene();
+        }}
+      />
+    );
+  }
 
   const [panelIndex, setPanelIndex] = useState<number>(0);
   const [displayedText, setDisplayedText] = useState<string>('');
@@ -183,7 +196,7 @@ export const CutscenePlayer: React.FC = () => {
           }}
         >
           <img
-            src={`/assets/cinematics/${currentPanel.image}`}
+            src={`${import.meta.env.BASE_URL}assets/cinematics/${currentPanel.image}`}
             alt=""
             onError={() => setImageError(true)}
             style={{
